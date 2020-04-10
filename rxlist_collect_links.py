@@ -35,8 +35,9 @@ def get_drugs_list(i, soup):
     for ul in uls:
         lis = ul.find_all('li')
         for li in lis:
-            result.append(li.a['href'])            
-    return {i: result}
+            if 'patient-images-side-effect' not in li.a['href']:
+                result.append(li.a['href'])            
+    return {i: list(set(result))}
 
 def get_page_url():
     ''' Перебираем страницы с линками на лекарства. Генератор '''
@@ -58,7 +59,7 @@ def collect_all_links():
 
 def main():
     all_links = collect_all_links()
-    write_file(all_links)
+    write_file(all_links, fname=('rxlist_links_dict_nodoubles.json'))
 
 
 if __name__ == "__main__":

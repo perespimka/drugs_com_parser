@@ -4,7 +4,8 @@ from bs4 import BeautifulSoup
 from rxlist_collect_links import write_file, get_html
 import re
 from bs4 import element
-from foo import drugs #Тестируем
+#from foo import drugs #Тестируем
+from rxlist_write_csv import q_links
 import logging
 
 logging.basicConfig(filename='log.txt', level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
@@ -170,8 +171,8 @@ def get_data(soup):
     pgContent_blocks = soup.find_all('div', attrs={'class': 'pgContent'})
     #drug_data['Drug name'] = pgContent_blocks[0].p.b.text.strip() #ПЛОХО!
     drug_data.update(combine_data(pgContent_blocks[0].children)) #Из первого блока берем components и forms
-
-
+    last_reviewed = soup.find('div', attrs={'class':'monolastreviewed'}).span.text
+    drug_data['Date of revision of the text'] = last_reviewed
     foo = True # Проверочная переменная для определения первого блока pgContent
     for pgContent in pgContent_blocks:
         # Пропустим первый блок
@@ -199,9 +200,10 @@ def rec_csv(list_of_dicts):
 def main():
     
     result = [] 
-    for drug in drugs:
-        soup = BeautifulSoup(get_html(drug), 'html.parser')
+    for link in q_links:
+        soup = BeautifulSoup(get_html(link), 'html.parser')
         result.append(get_data(soup))
+        
     write_file(result, fname='rxlist_q_data_json.json')
 
 if __name__ == "__main__":
