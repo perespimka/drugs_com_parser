@@ -16,15 +16,16 @@ FIELD_CONVERTS = {'INDICATIONS': 'Therapeutic indications', 'DESCRIPTION': None,
                   'WARNINGS': 'Special warnings and precautions for use',
                   'PRECAUTIONS': 'Special warnings and precautions for use', 'OVERDOSE': 'Overdose',
                   'CONTRAINDICATIONS': 'Contraindications', 'CLINICAL PHARMACOLOGY': 'Pharmacodynamic properties',
-                  'PATIENT INFORMATION': None, 
-
-                  
+                  'PATIENT INFORMATION': None, 'ADVERSE REACTIONS': None
 }
 URL = "https://www.rxlist.com/zagam-drug.htm"
 URL2 = 'https://www.rxlist.com/pegintron-and-rebetol-drug.htm'
 
 def components_and_form_re(raw_components):
-    '''Регуляркой находим компоненты и формы выпуска препарата и заменяем and'''
+    '''
+        Функция для первого блока pgContent.
+        Регуляркой находим компоненты и формы выпуска препарата и заменяем and
+    '''
     # Разбиваем на две группы (компоненты) и (формы)
     pattern = r'\((.+?)\)(.*)'
     try:
@@ -36,9 +37,9 @@ def components_and_form_re(raw_components):
         if components.count('(') > components.count(')'):
             components += ')'
     except AttributeError as er:
-        #print(f'Ошибка в регулярке: {er}')
+
         return None
-    return {'components': components, 'forms': forms}
+    return {'Components': components, 'Forms': forms}
       
 
 def combine_data(first_block_iter):
@@ -46,7 +47,7 @@ def combine_data(first_block_iter):
     Сбор данных для первого блока
     Объединяем данные из абзацев, где могут содержаться components и forms (в случае, если препарат комбинированный)
     '''
-    result = {'components':  '', 'forms': ''}
+    result = {'Components':  '', 'Forms': ''}
     try:
         for tag in first_block_iter:
             if tag.name == 'a':
@@ -66,17 +67,63 @@ def combine_data(first_block_iter):
 
     return result
 
+def clean_string_from_shit(string):
+    '''Очистка от переносов строк и лишних пробелов'''
+    string = string.strip()
+    string = string.replace('\n', '')
+    lst = string.split()
+    string = ' '.join(lst)
+    return string
+
+def attrs_cleaner(tag):
+    '''Очистка атрибутов'''
+    NAMES_TO_CLEAN = ['class']    
+    
+    if isinstance(tag, element.Tag):
+        tag.attrs = { key:val for key,val in tag.attrs.items() if key not in NAMES_TO_CLEAN}
+
+
+def link_to_text(a):
+    '''Меняет ссылку на текст'''
+    sub = BeautifulSoup(a.text, 'html.parser')
+    a.replace_with(sub)
+
+def cut_section_links_1(tag):
+    pattern = r'\([Ss]ee.+?\)'
+    string_tag = str(tag)
+    new_string = re.sub(pattern, '', string_tag, flags=re.DOTALL)
+    new_soup = BeautifulSoup(new_string, 'html.parser')
+
+    #Здесь не срабатывает replace_with, приходится менять через insert с очисткой unwrap
+    tag.string = '' 
+    tag.insert(0,new_soup)
+    if tag.p:
+        tag.p.unwrap()
+
+   
+
+
 def link_cleaner(tag):
     '''Ссылки превращаем в обычный текст, также ссылки на разделы сайта убираем'''
     links = tag.find_all('a')
+    flag_to_cut = False
+    for link in links:
+        if clean_string_from_shit(link.text) in FIELD_CONVERTS:
+            flag_to_cut = True
+        link_to_text(link)
+    if flag_to_cut:
+        cut_section_links_1(tag)
 
 def get_data_from_pgContent(pgContent):
     '''Собираем данные из одного блока. Возвращает словарь, ключ - имя поля таблицы описания препарата, значение - содержимое раздела'''
     result = {} # ключ - имя поля в таблице, значение - содержимое раздела
-    key = None
+    key = None # Переменная, определяющая в какой ключ словаря мы сохраняем содержимое тега. Если None - не сохраняем
     for tag in pgContent.children:
+        
         if isinstance(tag, element.Tag):
+            
             if tag.name == 'h3':
+
                 if tag.text in FIELD_CONVERTS:
                     tag_text = tag.text
                     key = FIELD_CONVERTS[tag_text] #Присваиваем имя поля в таблице как указано в ТЗ (в FIELD_CONVERTS это значения по ключам-разделам сайта)
@@ -88,14 +135,14 @@ def get_data_from_pgContent(pgContent):
                 else:
                     key = None
             elif key:
-                if tag.name in ['p', 'h4', 'h5']:
-                    #тут будет очистка содержимого
-                    result[key] += str(tag) # Сохраняем с разметкой. Надо еще чистить ссылки
-                elif tag.name == 'center':
-                    for child in tag.descendants:
-                        if isinstance(child, element.Tag):
-                            if child.name == 'table':
-                                result[key] += str(child)
+                if tag.name in ['p', 'h4', 'h5', ]:
+                    link_cleaner(tag) # Чистим ссылки
+                    tables = tag.find_all('table')
+                    for table in tables:
+                        attrs_cleaner(table)
+                        for table_tag in table.descendants:
+                            attrs_cleaner(table_tag)    
+                    result[key] += str(tag).strip() # Сохраняем с разметкой.
 
     return result
 
@@ -112,10 +159,11 @@ def get_all_headers(pgContent):
 #HEADERS = set()
 
 def get_data(soup):
-    '''Обработка страницы одного лекарства. Первый блок pgContent разбираем на drug name, components и forms. Остальные pgContent перебираем 
-       и отправляем в get_data_from_pgContent, откуда получаем словарь (этот словарь может иметь несколько ключей): 
-       ключ имя поля таблицы описания, значение - само описание. 
-       Расширяем результирующий словарь по препарату drug_data словариками из каждого pgContent
+    '''
+        Обработка страницы одного лекарства. Первый блок pgContent разбираем на drug name, components и forms. Остальные pgContent перебираем 
+        и отправляем в get_data_from_pgContent, откуда получаем словарь (этот словарь может иметь несколько ключей): 
+        ключ имя поля таблицы описания, значение - само описание. 
+        Расширяем результирующий словарь по препарату drug_data словариками из каждого pgContent
     '''
 
     drug_data = {} # Сюда собираем все разделы в соответствующие поля (ключи словаря)
@@ -145,16 +193,21 @@ def get_data(soup):
     
     return drug_data
 
+def rec_csv(list_of_dicts):
+    field_names = ['']
 
 def main():
+    
+    result = [] 
     for drug in drugs:
         soup = BeautifulSoup(get_html(drug), 'html.parser')
-        get_data(soup)
-    #write_file(list(HEADERS), fname='HEADERS.json')
+        result.append(get_data(soup))
+    write_file(result, fname='rxlist_q_data_json.json')
 
 if __name__ == "__main__":
-    '''
+
     main()
-    '''
-    soup = BeautifulSoup(get_html(URL2), 'html.parser')
-    write_file(get_data(soup), fname='test_drug_data.json')
+ 
+    #soup = BeautifulSoup(get_html(URL2), 'html.parser')
+    #write_file(get_data(soup), fname='test_drug_data.json')
+
