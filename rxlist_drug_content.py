@@ -21,18 +21,37 @@ FIELD_CONVERTS = {'INDICATIONS': 'Therapeutic indications', 'DESCRIPTION': None,
 }
 URL = "https://www.rxlist.com/zagam-drug.htm"
 URL2 = 'https://www.rxlist.com/pegintron-and-rebetol-drug.htm'
+URL3 = 'https://www.rxlist.com/quinidex-drug.htm'
+URL4 = 'https://www.rxlist.com/gardasil-drug.htm'
+
+def clean_string_from_shit(string):
+    '''Очистка от переносов строк и лишних пробелов'''
+    string = string.strip()
+    string = string.replace('\n', '')
+    lst = string.split()
+    string = ' '.join(lst)
+    return string
+
+def clean_and(components):
+    components = components.replace(', and ', ', ')
+    components = components.replace(' and ', ', ')
+    return components
 
 def components_and_form_re(raw_components):
     '''
-        Функция для первого блока pgContent.
+        Функция для первого блока pgContent. Принимает текст абзаца.
         Регуляркой находим компоненты и формы выпуска препарата и заменяем and
     '''
     # Разбиваем на две группы (компоненты) и (формы)
-    pattern = r'\((.+?)\)(.*)'
+    raw_components = clean_string_from_shit(raw_components)
+    if '[' in raw_components:
+        print('im here mazafcker')
+        pattern = r'\[(.+?)\](.*)'
+    else:
+        pattern = r'\((.+?)\)(.*)'
     try:
         components, forms = re.search(pattern, raw_components).groups()
-        components = components.replace(', and ', ', ')
-        components = components.replace(' and ', ', ')
+        components = clean_and(components)
         forms = forms.strip()
         # Проверям на закрытые скобки, добавляем ")", если не хватает
         if components.count('(') > components.count(')'):
@@ -63,18 +82,13 @@ def combine_data(first_block_iter):
                                 result[key] += ', ' + val
                             else:
                                 result[key] = val
+
     except Exception as e:
         logging.debug(f'Ошибка в combine_data: {e}')
 
     return result
 
-def clean_string_from_shit(string):
-    '''Очистка от переносов строк и лишних пробелов'''
-    string = string.strip()
-    string = string.replace('\n', '')
-    lst = string.split()
-    string = ' '.join(lst)
-    return string
+
 
 def attrs_cleaner(tag):
     '''Очистка атрибутов'''
@@ -171,7 +185,13 @@ def get_data(soup):
     pgContent_blocks = soup.find_all('div', attrs={'class': 'pgContent'})
     #drug_data['Drug name'] = pgContent_blocks[0].p.b.text.strip() #ПЛОХО!
     drug_data.update(combine_data(pgContent_blocks[0].children)) #Из первого блока берем components и forms
-    last_reviewed = soup.find('div', attrs={'class':'monolastreviewed'}).span.text
+    #Если дынные о компонентах в первом разделе не найдены, возмем их из заголовка
+    if not drug_data['Components']:
+        components = soup.find('li', attrs={'itemprop': 'name'}).span.text
+
+        drug_data['Components'] = clean_and(components)
+
+    last_reviewed = soup.find('div', attrs={'class':'monolastreviewed'}).span.text #Дата релиза описания на сайте
     drug_data['Date of revision of the text'] = last_reviewed
     foo = True # Проверочная переменная для определения первого блока pgContent
     for pgContent in pgContent_blocks:
@@ -194,9 +214,6 @@ def get_data(soup):
     
     return drug_data
 
-def rec_csv(list_of_dicts):
-    field_names = ['']
-
 def main():
     
     result = [] 
@@ -206,9 +223,17 @@ def main():
         
     write_file(result, fname='rxlist_q_data_json.json')
 
+def test_components():
+    soup = BeautifulSoup(get_html(URL4), 'html.parser')
+    test_res = get_data(soup)
+    print(test_res['Components'])
+    print('---')
+    print(test_res['Forms'])
+
 if __name__ == "__main__":
 
-    main()
+    #main()
+    test_components()
  
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
