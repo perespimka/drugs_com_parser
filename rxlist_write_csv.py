@@ -4,8 +4,297 @@ from rxlist_collect_links import write_file
 
 field_names = ['Drug name', 'Components', 'Forms', 'Therapeutic indications', 'Dosage (Posology) and method of administration', 'Contraindications',
                'Special warnings and precautions for use', 'Interaction with other medicinal products and other forms of interaction',
-               'Undesirable effects', 'Overdose', 'Pharmacodynamic properties', 'Date of revision of the text'
+               'Undesirable effects', 'Overdose', 'Pharmacodynamic properties', 'Special precautions for disposal and other handling',
+               'Date of revision of the text'
 ]
+
+
+def from_json_to_csv():
+    with open('rxlist_r_data_json.json') as f:
+        drugs_lst = json.load(f)
+    with open('rxlist_results_r.csv', 'w') as f:
+        writer = csv.DictWriter(f, fieldnames=field_names)
+        writer.writeheader()
+        for drug_dict in drugs_lst:
+            writer.writerow(drug_dict)
+
+def links_starting_of(letter):
+    with open('rxlist_links_dict_nodoubles.json') as f:
+        all_links = json.load(f)
+    links = all_links[letter]
+    return links
+
+def main():
+    from_json_to_csv()
+
+def rewrite_list_of_forms():
+    new_list = []
+    with open('list_of_forms.json') as f:
+        forms = json.load(f)
+    with open('forms2.txt') as f:
+        for line in f:
+            new_list.append(line)
+    forms.extend(new_list)
+    count = 0
+    for form in forms:
+        forms[count] = form.lower().strip()
+        count += 1
+    forms = list(set(forms))
+    write_file(forms, fname='forms.json')
+          
+
+if __name__ == "__main__":
+    main()
+    #rewrite_list_of_forms()
+    #links = links_starting_of('q')
+    #write_file(links, fname='q_links.json')
+
+r_links = [
+        "https://www.rxlist.com/renvela-drug.htm",
+        "https://www.rxlist.com/rinvoq-drug.htm",
+        "https://www.rxlist.com/rhogam-drug.htm",
+        "https://www.rxlist.com/radiogenix-system-drug.htm",
+        "https://www.rxlist.com/evenity-drug.htm",
+        "https://www.rxlist.com/avandaryl-drug.htm",
+        "https://www.rxlist.com/rowasa-drug.htm",
+        "https://www.rxlist.com/ryzolt-drug.htm",
+        "https://www.rxlist.com/r-gene-10-drug.htm",
+        "https://www.rxlist.com/rocklatan-drug.htm",
+        "https://www.rxlist.com/reditrex-drug.htm",
+        "https://www.rxlist.com/rapivab-drug.htm",
+        "https://www.rxlist.com/rebetron-drug.htm",
+        "https://www.rxlist.com/flumadine-drug.htm",
+        "https://www.rxlist.com/nurtec-odt-drug.htm",
+        "https://www.rxlist.com/ultiva-drug.htm",
+        "https://www.rxlist.com/aciphex-drug.htm",
+        "https://www.rxlist.com/renflexis-drug.htm",
+        "https://www.rxlist.com/rilutek-drug.htm",
+        "https://www.rxlist.com/roxicodone-drug.htm",
+        "https://www.rxlist.com/repronex-drug.htm",
+        "https://www.rxlist.com/robitussin-ac-drug.htm",
+        "https://www.rxlist.com/lexiscan-drug.htm",
+        "https://www.rxlist.com/rebinyn-drug.htm",
+        "https://www.rxlist.com/reglan-drug.htm",
+        "https://www.rxlist.com/daliresp-drug.htm",
+        "https://www.rxlist.com/evista-drug.htm",
+        "https://www.rxlist.com/restylane-lyft-drug.htm",
+        "https://www.rxlist.com/revex-drug.htm",
+        "https://www.rxlist.com/recothrom-drug.htm",
+        "https://www.rxlist.com/elitek-drug.htm",
+        "https://www.rxlist.com/rosanil-drug.htm",
+        "https://www.rxlist.com/rituxan-drug.htm",
+        "https://www.rxlist.com/robaxin-drug.htm",
+        "https://www.rxlist.com/requip-xl-drug.htm",
+        "https://www.rxlist.com/reclast-drug.htm",
+        "https://www.rxlist.com/relenza-drug.htm",
+        "https://www.rxlist.com/reglan-odt-drug.htm",
+        "https://www.rxlist.com/renagel-drug.htm",
+        "https://www.rxlist.com/rescula-drug.htm",
+        "https://www.rxlist.com/rayaldee-drug.htm",
+        "https://www.rxlist.com/prandimet-drug.htm",
+        "https://www.rxlist.com/rifamate-drug.htm",
+        "https://www.rxlist.com/risperdal-drug.htm",
+        "https://www.rxlist.com/rozlytrek-drug.htm",
+        "https://www.rxlist.com/istodax-drug.htm",
+        "https://www.rxlist.com/renova-drug.htm",
+        "https://www.rxlist.com/rozerem-drug.htm",
+        "https://www.rxlist.com/mycobutin-drug.htm",
+        "https://www.rxlist.com/recarbrio-drug.htm",
+        "https://www.rxlist.com/actonel-with-calcium-drug.htm",
+        "https://www.rxlist.com/rexulti-drug.htm",
+        "https://www.rxlist.com/rotarix-drug.htm",
+        "https://www.rxlist.com/rattlesnake-antivenin-drug.htm",
+        "https://www.rxlist.com/roferon-a-drug.htm",
+        "https://www.rxlist.com/rotateq-drug.htm",
+        "https://www.rxlist.com/remodulin-drug.htm",
+        "https://www.rxlist.com/relistor-drug.htm",
+        "https://www.rxlist.com/rimso-50-drug.htm",
+        "https://www.rxlist.com/rectiv-drug.htm",
+        "https://www.rxlist.com/rybelsus-drug.htm",
+        "https://www.rxlist.com/rixubis-drug.htm",
+        "https://www.rxlist.com/reglan-injection-drug.htm",
+        "https://www.rxlist.com/retisert-drug.htm",
+        "https://www.rxlist.com/stivarga-drug.htm",
+        "https://www.rxlist.com/renova-002-drug.htm",
+        "https://www.rxlist.com/cardiogen-82-drug.htm",
+        "https://www.rxlist.com/regonol-drug.htm",
+        "https://www.rxlist.com/rasuvo-drug.htm",
+        "https://www.rxlist.com/radicava-drug.htm",
+        "https://www.rxlist.com/retavase-drug.htm",
+        "https://www.rxlist.com/ruxience-drug.htm",
+        "https://www.rxlist.com/aemcolo-drug.htm",
+        "https://www.rxlist.com/cyramza-drug.htm",
+        "https://www.rxlist.com/raplon-drug.htm",
+        "https://www.rxlist.com/intron-a-rebetol-drug.htm",
+        "https://www.rxlist.com/perseris-drug.htm",
+        "https://www.rxlist.com/biavax-drug.htm",
+        "https://www.rxlist.com/reblozyl-drug.htm",
+        "https://www.rxlist.com/roweepra-xr-drug.htm",
+        "https://www.rxlist.com/banzel-drug.htm",
+        "https://www.rxlist.com/reyataz-drug.htm",
+        "https://www.rxlist.com/rifadin-drug.htm",
+        "https://www.rxlist.com/retacrit-drug.htm",
+        "https://www.rxlist.com/ringers-in-dextrose-drug.htm",
+        "https://www.rxlist.com/skyrizi-drug.htm",
+        "https://www.rxlist.com/rybix-odt-drug.htm",
+        "https://www.rxlist.com/rimactane-drug.htm",
+        "https://www.rxlist.com/rebetol-drug.htm",
+        "https://www.rxlist.com/ridaura-drug.htm",
+        "https://www.rxlist.com/ranexa-drug.htm",
+        "https://www.rxlist.com/raxibacumab-drug.htm",
+        "https://www.rxlist.com/rapamune-drug.htm",
+        "https://www.rxlist.com/refacto-drug.htm",
+        "https://www.rxlist.com/reprexain-drug.htm",
+        "https://www.rxlist.com/zemuron-drug.htm",
+        "https://www.rxlist.com/imogam-rabies-drug.htm",
+        "https://www.rxlist.com/radiogardase-drug.htm",
+        "https://www.rxlist.com/kisqali-drug.htm",
+        "https://www.rxlist.com/restylane-l-drug.htm",
+        "https://www.rxlist.com/ruconest-drug.htm",
+        "https://www.rxlist.com/exelon-patch-drug.htm",
+        "https://www.rxlist.com/bayrab-drug.htm",
+        "https://www.rxlist.com/rezulin-drug.htm",
+        "https://www.rxlist.com/rythmol-drug.htm",
+        "https://www.rxlist.com/rhogam-ultra-filtered-plus-drug.htm",
+        "https://www.rxlist.com/exelon-drug.htm",
+        "https://www.rxlist.com/revatio-drug.htm",
+        "https://www.rxlist.com/reclipsen-drug.htm",
+        "https://www.rxlist.com/regranex-drug.htm",
+        "https://www.rxlist.com/prandin-drug.htm",
+        "https://www.rxlist.com/varubi-drug.htm",
+        "https://www.rxlist.com/riomet-drug.htm",
+        "https://www.rxlist.com/radiesse-drug.htm",
+        "https://www.rxlist.com/edurant-drug.htm",
+        "https://www.rxlist.com/restoril-drug.htm",
+        "https://www.rxlist.com/novolin-r-drug.htm",
+        "https://www.rxlist.com/rosula-drug.htm",
+        "https://www.rxlist.com/remicade-drug.htm",
+        "https://www.rxlist.com/rufinamide-drug.htm",
+        "https://www.rxlist.com/tritec-drug.htm",
+        "https://www.rxlist.com/imovax-drug.htm",
+        "https://www.rxlist.com/roxicodone-15-30-mg-drug.htm",
+        "https://www.rxlist.com/ritalin-drug.htm",
+        "https://www.rxlist.com/jakafi-drug.htm",
+        "https://www.rxlist.com/neupro-drug.htm",
+        "https://www.rxlist.com/robinul-tablets-drug.htm",
+        "https://www.rxlist.com/revlimid-drug.htm",
+        "https://www.rxlist.com/rhinocort-aqua-drug.htm",
+        "https://www.rxlist.com/ragwitek-drug.htm",
+        "https://www.rxlist.com/ryanodex-drug.htm",
+        "https://www.rxlist.com/rythmol-sr-drug.htm",
+        "https://www.rxlist.com/renacidin-drug.htm",
+        "https://www.rxlist.com/restylane-silk-drug.htm",
+        "https://www.rxlist.com/revonto-drug.htm",
+        "https://www.rxlist.com/rabavert-drug.htm",
+        "https://www.rxlist.com/rocephin-drug.htm",
+        "https://www.rxlist.com/restasis-drug.htm",
+        "https://www.rxlist.com/norvir-drug.htm",
+        "https://www.rxlist.com/ritalin-la-drug.htm",
+        "https://www.rxlist.com/altabax-drug.htm",
+        "https://www.rxlist.com/roxanol-drug.htm",
+        "https://www.rxlist.com/requip-drug.htm",
+        "https://www.rxlist.com/raptiva-drug.htm",
+        "https://www.rxlist.com/razadyne-er-drug.htm",
+        "https://www.rxlist.com/vexol-drug.htm",
+        "https://www.rxlist.com/yupelri-drug.htm",
+        "https://www.rxlist.com/rydapt-drug.htm",
+        "https://www.rxlist.com/kedrab-drug.htm",
+        "https://www.rxlist.com/hyperrab-drug.htm",
+        "https://www.rxlist.com/photrexa-viscous-drug.htm",
+        "https://www.rxlist.com/rhofade-drug.htm",
+        "https://www.rxlist.com/nplate-drug.htm",
+        "https://www.rxlist.com/recombinate-drug.htm",
+        "https://www.rxlist.com/ezallor-drug.htm",
+        "https://www.rxlist.com/retin-a-drug.htm",
+        "https://www.rxlist.com/roweepra-drug.htm",
+        "https://www.rxlist.com/roxybond-drug.htm",
+        "https://www.rxlist.com/rocaltrol-drug.htm",
+        "https://www.rxlist.com/zantac-drug.htm",
+        "https://www.rxlist.com/raxar-drug.htm",
+        "https://www.rxlist.com/rheumatrex-drug.htm",
+        "https://www.rxlist.com/refludan-drug.htm",
+        "https://www.rxlist.com/recedo-drug.htm",
+        "https://www.rxlist.com/rytary-drug.htm",
+        "https://www.rxlist.com/exservan-drug.htm",
+        "https://www.rxlist.com/ultomiris-drug.htm",
+        "https://www.rxlist.com/rosadan-gel-drug.htm",
+        "https://www.rxlist.com/isentress-drug.htm",
+        "https://www.rxlist.com/reyvow-drug.htm",
+        "https://www.rxlist.com/revia-drug.htm",
+        "https://www.rxlist.com/priftin-drug.htm",
+        "https://www.rxlist.com/rituxan-hycela-drug.htm",
+        "https://www.rxlist.com/roxicet-drug.htm",
+        "https://www.rxlist.com/ruby-fill-drug.htm",
+        "https://www.rxlist.com/rhophylac-drug.htm",
+        "https://www.rxlist.com/arcalyst-drug.htm",
+        "https://www.rxlist.com/reopro-drug.htm",
+        "https://www.rxlist.com/remeron-drug.htm",
+        "https://www.rxlist.com/copegus-drug.htm",
+        "https://www.rxlist.com/kisqali-femara-co-pack-drug.htm",
+        "https://www.rxlist.com/riastap-drug.htm",
+        "https://www.rxlist.com/maxalt-drug.htm",
+        "https://www.rxlist.com/atelvia-drug.htm",
+        "https://www.rxlist.com/xofigo-drug.htm",
+        "https://www.rxlist.com/xarelto-drug.htm",
+        "https://www.rxlist.com/naropin-drug.htm",
+        "https://www.rxlist.com/virazole-drug.htm",
+        "https://www.rxlist.com/rubraca-drug.htm",
+        "https://www.rxlist.com/rayos-drug.htm",
+        "https://www.rxlist.com/avandia-drug.htm",
+        "https://www.rxlist.com/rescriptor-drug.htm",
+        "https://www.rxlist.com/repatha-drug.htm",
+        "https://www.rxlist.com/restylane-drug.htm",
+        "https://www.rxlist.com/retin-a-micro-drug.htm",
+        "https://www.rxlist.com/ryzodeg-drug.htm",
+        "https://www.rxlist.com/ravicti-drug.htm",
+        "https://www.rxlist.com/rebif-drug.htm",
+        "https://www.rxlist.com/rifater-drug.htm",
+        "https://www.rxlist.com/raplixa-drug.htm",
+        "https://www.rxlist.com/rapaflo-capsules-drug.htm",
+        "https://www.rxlist.com/hyperrho-mini-dose-drug.htm",
+        "https://www.rxlist.com/xifaxan-drug.htm",
+        "https://www.rxlist.com/retrovir-drug.htm",
+        "https://www.rxlist.com/robinul-drug.htm",
+        "https://www.rxlist.com/hyperrho-full-dose-drug.htm",
+        "https://www.rxlist.com/norvir-capsules-drug.htm",
+        "https://www.rxlist.com/recombivax-drug.htm",
+        "https://www.rxlist.com/atryn-drug.htm",
+        "https://www.rxlist.com/revcovi-drug.htm",
+        "https://www.rxlist.com/relafen-drug.htm",
+        "https://www.rxlist.com/zantac-injection-drug.htm",
+        "https://www.rxlist.com/readi-cat-2-drug.htm",
+        "https://www.rxlist.com/romazicon-drug.htm",
+        "https://www.rxlist.com/rosadan-cream-drug.htm",
+        "https://www.rxlist.com/moderiba-drug.htm",
+        "https://www.rxlist.com/adempas-drug.htm",
+        "https://www.rxlist.com/rezira-drug.htm",
+        "https://www.rxlist.com/azilect-drug.htm",
+        "https://www.rxlist.com/retrovir-iv-drug.htm",
+        "https://www.rxlist.com/tiglutik-drug.htm",
+        "https://www.rxlist.com/riomet-er-drug.htm",
+        "https://www.rxlist.com/avandamet-drug.htm",
+        "https://www.rxlist.com/cinqair-drug.htm",
+        "https://www.rxlist.com/ruzurgi-drug.htm",
+        "https://www.rxlist.com/risperdal-consta-drug.htm",
+        "https://www.rxlist.com/relpax-drug.htm",
+        "https://www.rxlist.com/vioxx-drug.htm",
+        "https://www.rxlist.com/crestor-drug.htm",
+        "https://www.rxlist.com/rosuvastatin-calcium-drug.htm",
+        "https://www.rxlist.com/rondec-drug.htm",
+        "https://www.rxlist.com/truxima-drug.htm",
+        "https://www.rxlist.com/lucentis-drug.htm",
+        "https://www.rxlist.com/actonel-drug.htm",
+        "https://www.rxlist.com/meruvax-drug.htm",
+        "https://www.rxlist.com/remeron-soltab-drug.htm",
+        "https://www.rxlist.com/altace-drug.htm",
+        "https://www.rxlist.com/isonarif-drug.htm",
+        "https://www.rxlist.com/rhopressa-drug.htm",
+        "https://www.rxlist.com/aciphex-sprinkle-drug.htm",
+        "https://www.rxlist.com/hp-acthar-gel-drug.htm",
+        "https://www.rxlist.com/altace-capsules-drug.htm",
+        "https://www.rxlist.com/renese-drug.htm"
+    ]
+
 q_links = [
         "https://www.rxlist.com/qutenza-drug.htm",
         "https://www.rxlist.com/quadracel-drug.htm",
@@ -44,26 +333,57 @@ q_links = [
     ]
 
 
-def from_json_to_csv():
-    with open('rxlist_q_data_json.json') as f:
-        drugs_lst = json.load(f)
-    with open('rxlist_results_q.csv', 'w') as f:
-        writer = csv.DictWriter(f, fieldnames=field_names)
-        writer.writeheader()
-        for drug_dict in drugs_lst:
-            writer.writerow(drug_dict)
-
-def links_starting_of(letter):
-    with open('rxlist_links_dict_nodoubles.json') as f:
-        all_links = json.load(f)
-    links = all_links[letter]
-    return links
-
-def main():
-    from_json_to_csv()
-
-if __name__ == "__main__":
-    main()
-
-    #links = links_starting_of('q')
-    #write_file(links, fname='q_links.json')
+FORMS_LIST = [
+    "dental cone",
+    "enema",
+    "infusion",
+    "paste",
+    "injection",
+    "transdermal system",
+    "tablet",
+    "oxymel",
+    "single-dose delivery system",
+    "nasal drops",
+    "powder",
+    "capsule",
+    "syrup",
+    "inhaler",
+    "lozenge",
+    "ointment",
+    "pressurized dispenser",
+    "irrigation solution",
+    "nebulizer",
+    "aerosol spray",
+    "extract",
+    "pessary",
+    "collodion",
+    "rectal suspension enema",
+    "liniment",
+    "liquid preparation",
+    "aromatic water",
+    "paint",
+    "oral solution",
+    "suspension",
+    "ophthalmic solution",
+    "nasal spray",
+    "ophthalmic emulsion",
+    "granule",
+    "spirit",
+    "patch",
+    "ear drops",
+    "pills",
+    "tincture",
+    "rectal suppositories",
+    "inhalation solution",
+    "gel",
+    "pastille",
+    "aerosol",
+    "dusting powder",
+    "eye drops",
+    "poultice",
+    "injectable gel",
+    "lotions",
+    "suppository",
+    "atomizer",
+    "cream"
+]

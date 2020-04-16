@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 from rxlist_collect_links import write_file, get_html
 import re
 from bs4 import element
-#from foo import drugs #Тестируем
 from rxlist_write_csv import q_links, r_links, FORMS_LIST
 import logging
 
@@ -12,7 +11,7 @@ logging.basicConfig(filename='log.txt', level=logging.DEBUG, format='%(asctime)s
 
 FIELD_CONVERTS = {'INDICATIONS': 'Therapeutic indications', 'DESCRIPTION': None, 
                   'DOSAGE AND ADMINISTRATION': 'Dosage (Posology) and method of administration', 
-                  'SIDE EFFECTS': 'Undesirable effects', 'HOW SUPPLIED': 'How supplied',
+                  'SIDE EFFECTS': 'Undesirable effects', 'HOW SUPPLIED': 'Special precautions for disposal and other handling',
                   'DRUG INTERACTIONS': 'Interaction with other medicinal products and other forms of interaction',
                   'WARNINGS': 'Special warnings and precautions for use',
                   'PRECAUTIONS': 'Special warnings and precautions for use', 'OVERDOSE': 'Overdose',
@@ -24,6 +23,11 @@ URL2 = 'https://www.rxlist.com/pegintron-and-rebetol-drug.htm'
 URL3 = 'https://www.rxlist.com/quinidex-drug.htm'
 URL4 = 'https://www.rxlist.com/gardasil-drug.htm'
 URL5 = 'https://www.rxlist.com/qnasl-drug.htm'
+URL6 = 'https://www.rxlist.com/atryn-drug.htm'
+URL7 = 'https://www.rxlist.com/ragwitek-drug.htm'
+URL8 = 'https://www.rxlist.com/zantac-drug.htm'
+URL9 = 'https://www.rxlist.com/refludan-drug.htm'
+URL10 = 'https://www.rxlist.com/ryzolt-drug.htm'
 
 def clean_string_from_shit(string):
     '''Очистка от переносов строк и лишних пробелов'''
@@ -41,34 +45,32 @@ def clean_and(components):
 def components_and_form_re(raw_components):
     '''
         Функция для первого блока pgContent. Принимает текст абзаца.
-        Регуляркой находим компоненты и формы выпуска препарата и заменяем and
+        Регуляркой находим компоненты   препарата и заменяем and
     '''
-    # Разбиваем на две группы (компоненты) и (формы)
-    raw_components = clean_string_from_shit(raw_components)
-    if '[' in raw_components:
-        pattern = r'\[(.+?)\](.*)'
-    else:
-        pattern = r'\((.+?)\)(.*)'
+    
+    #raw_components = clean_string_from_shit(raw_components)
+    raw_components = raw_components.replace('[', '(')
+    raw_components = raw_components.replace(']', ')')
+    pattern = r'^\((.+)\)'
+        
     try:
-        components, forms = re.search(pattern, raw_components).groups()
+        components = re.search(pattern, raw_components, flags=re.MULTILINE).group(1)
         components = clean_and(components)
-        forms = forms.strip()
-        forms = clean_and(forms)
         # Проверям на закрытые скобки, добавляем ")", если не хватает
         if components.count('(') > components.count(')'):
             components += ')'
     except AttributeError as er:
 
         return None
-    return {'Components': components, 'Forms': forms}
+    return {'Components': components}
       
 
 def combine_data(first_block_iter):
     '''
     Сбор данных для первого блока
-    Объединяем данные из абзацев, где могут содержаться components и forms (в случае, если препарат комбинированный)
+    Объединяем данные из абзацев, где могут содержаться components  (в случае, если препарат комбинированный)
     '''
-    result = {'Components':  '', 'Forms': ''}
+    result = {'Components':  ''}
     try:
         for tag in first_block_iter:
             if tag.name == 'a':
@@ -112,19 +114,15 @@ def cut_section_links_1(tag):
     new_string = re.sub(pattern2, '', new_string, flags=re.DOTALL)
     new_soup = BeautifulSoup(new_string, 'html.parser')
 
+    #tag.replace_with(new_soup)
     #Здесь не срабатывает replace_with, приходится менять через insert с очисткой unwrap
     tag.string = '' 
     tag.insert(0,new_soup)
-    if tag.p:
-        tag.p.unwrap()
-
-   
-
+    tag.contents[0].unwrap()
 
 def link_cleaner(tag):
     '''Ссылки превращаем в обычный текст, также ссылки на разделы сайта убираем'''
     links = tag.find_all('a')
-
     for link in links:
         link_to_text(link)
 
@@ -134,12 +132,13 @@ def get_data_from_pgContent(pgContent):
     '''Собираем данные из одного блока. Возвращает словарь, ключ - имя поля таблицы описания препарата, значение - содержимое раздела'''
     result = {} # ключ - имя поля в таблице, значение - содержимое раздела
     key = None # Переменная, определяющая в какой ключ словаря мы сохраняем содержимое тега. Если None - не сохраняем
+    p_with_align = pgContent.find_all('p', attrs={'align': 'center'}) #Ошибка soup, тег p align="center" не закрывается там, где должен. необходимо его развернуть
+    for p in p_with_align:
+        p.unwrap()
+    
     for tag in pgContent.children:
-        
         if isinstance(tag, element.Tag):
-            
             if tag.name == 'h3':
-
                 if tag.text in FIELD_CONVERTS:
                     tag_text = tag.text
                     key = FIELD_CONVERTS[tag_text] #Присваиваем имя поля в таблице как указано в ТЗ (в FIELD_CONVERTS это значения по ключам-разделам сайта)
@@ -151,14 +150,20 @@ def get_data_from_pgContent(pgContent):
                 else:
                     key = None
             elif key:
-                if tag.name in ['p', 'h4', 'h5', ]:
+                if tag.name in ['p', 'h4', 'h5', 'ul', 'center']:
                     link_cleaner(tag) # Чистим ссылки
                     cut_section_links_1(tag)
+                    '''
                     tables = tag.find_all('table')
                     for table in tables:
                         attrs_cleaner(table)
                         for table_tag in table.descendants:
-                            attrs_cleaner(table_tag)    
+                            attrs_cleaner(table_tag) 
+                    '''
+                    attrs_cleaner(tag) 
+                    
+                    for taggy in tag.descendants:
+                        attrs_cleaner(taggy)
                     result[key] += str(tag).strip() # Сохраняем с разметкой.
 
     return result
@@ -178,11 +183,66 @@ def get_all_headers(pgContent):
 def try_to_find_forms(string):
     '''Проверяем строку на наличие известных форм, возвращаем список найденных форм'''
     result = []
+    string = string.lower()
     for form in FORMS_LIST:
         if form in string:
             result.append(form)
-    result = list(set(result))
-    return ', '.join(result)
+    return result
+
+def form_finder(soup, drug_data):
+    '''
+    Поиск известных нам форм в трех местах - заголовок страницы, первый абзац и How supplied.
+    Если находим в заголовке - вырезаем оттуда
+    '''
+    result = []
+    drug_data['Forms'] = ''
+    generic_name_tag = soup.find('li', attrs={'itemprop': 'name'}).span
+    generic_name = generic_name_tag.text
+    result.extend(try_to_find_forms(generic_name))
+    if len(result) > 0:
+        drug_data['Forms'] = ', '.join(list(set(result)))
+        for form in result:
+            pattern = f'({form})' + r'(s{0,1})' #Убираем s в конце слова, например tablets, capsules
+            generic_name = re.sub(pattern, '', generic_name)
+
+        generic_name_tag.string = generic_name
+
+    else:
+    
+        for tag in soup.find('div', attrs={'class': 'pgContent'}).children:
+            try:
+                if tag.name == 'a':
+                    break
+                else:
+                    if tag.name == 'p':
+                        result.extend(try_to_find_forms(tag.text))
+            except:
+                pass
+
+        if len(result) > 0:
+            drug_data['Forms'] = ', '.join(list(set(result))) 
+        else:
+            try:
+                result.extend(try_to_find_forms(drug_data['Special precautions for disposal and other handling']))
+                drug_data['Forms'] = ', '.join(list(set(result))) 
+            except:
+                pass
+
+
+def get_drug_name(pgContent, drug_data, soup):
+    '''Из первого блока возьмем первый абзац, в котором содержится имя препарата'''
+    for tag in pgContent.children:
+        if tag.name == 'p':
+            #Есть страницы, где нет имени и компонентов/форм в разделах. В таком случае возьмем из заголовка страницы имя препарата
+            try:
+                drug_data['Drug name'] = tag.b.text.strip()
+            except:
+                drug_data['Drug name'] = soup.h1.text
+                logging.info(f'Имя {drug_data["Drug name"]} взято из резервного источника')
+            break  
+    
+
+
 
 def get_data(soup):
     '''
@@ -194,62 +254,37 @@ def get_data(soup):
 
     drug_data = {} # Сюда собираем все разделы в соответствующие поля (ключи словаря)
     pgContent_blocks = soup.find_all('div', attrs={'class': 'pgContent'})
-    #drug_data['Drug name'] = pgContent_blocks[0].p.b.text.strip() #ПЛОХО!
     drug_data.update(combine_data(pgContent_blocks[0].children)) #Из первого блока берем components и forms
-    #Если дынные о компонентах в первом разделе не найдены, возмем их из заголовка
+    get_drug_name(pgContent_blocks[0], drug_data, soup)
+    #Если данные о компонентах в первом разделе не найдены, возмем их из заголовка
     if not drug_data['Components']:
         components = soup.find('li', attrs={'itemprop': 'name'}).span.text
         drug_data['Components'] = clean_and(components)
 
     last_reviewed = soup.find('div', attrs={'class':'monolastreviewed'}).span.text #Дата релиза описания на сайте
     drug_data['Date of revision of the text'] = last_reviewed
-    foo = True # Проверочная переменная для определения первого блока pgContent
-    for pgContent in pgContent_blocks:
-        # Пропустим первый блок
-        if foo:
-            # Из первого блока возьмем первый абзац, в котором содержится имя препарата
-            for tag in pgContent.children:
-                if tag.name == 'p':
-                    #Есть страницы, где нет имени и компонентов/форм в разделах. В таком случае возьмем из заголовка страницы имя препарата
-                    try:
-                        drug_data['Drug name'] = tag.b.text.strip()
-                    except:
-                        drug_data['Drug name'] = soup.h1.text
-                        logging.info(f'Имя {drug_data["Drug name"]} взято из резервного источника')
-                    break   
-            foo = False
-            continue
+    #Перебираем блоки pgContent начиная со второго
+    for pgContent in pgContent_blocks[1:]:
         data_from_pgContent = get_data_from_pgContent(pgContent)
-        drug_data.update(data_from_pgContent)
+        #Т.к. содержимое одного раздела может находиться в разных блоках pgContent мы не делаем drug_data.update(), а проверяем, существует ли ключ
+        for key in data_from_pgContent:
+            if key in drug_data:
+                drug_data[key] += data_from_pgContent[key]
+            else:
+                 drug_data[key] = data_from_pgContent[key]
 
-    '''
-    Если формы слишком длинные, значит скорее всего в них ошибка, удалим и проверим два раздела (первый и How supplied) на содержание в себе 
-    известных нам форм. Раздел How supplied нам не нужен, его впоследствии удаляем.
-    '''
-    if len(drug_data['Forms']) > 60:
-        drug_data['Forms'] = ''
-    
-    if not drug_data['Forms']:
-        try:
-            drug_data['Forms'] = try_to_find_forms(pgContent_blocks[0])
-            drug_data['Forms'] += try_to_find_forms(drug_data['How supplied'])
-            logging.info(f'Формы добавлены в препарат: {drug_data["Drug name"]}')
-    
-        except Exception as e:
-            print(e)
-
-    try:
-        drug_data.pop('How supplied')    
-    except:
-        print('В описании не было ключа How supplied')
-    
+    form_finder(soup, drug_data) #Поиск форм
+    if not drug_data['Components']: # Дополнительное определение компонентов должно быть после поиска форм, т.к. там вычитаются формы из компонентов в заголовке
+        components = soup.find('li', attrs={'itemprop': 'name'}).span.text
+        drug_data['Components'] = clean_and(components)
+   
     return drug_data
 
 def main():
     
     result = [] 
     for link in q_links:
-        soup = BeautifulSoup(get_html(link), 'html.parser')
+        soup = BeautifulSoup(get_html(link), 'lxml')
         result.append(get_data(soup))
         
     write_file(result, fname='rxlist_q_data_json.json')
@@ -257,9 +292,11 @@ def main():
 
 # TESTS 
 def test_components():
-    soup = BeautifulSoup(get_html(URL5), 'html.parser')
+    soup = BeautifulSoup(get_html(URL9), 'lxml')
+    write_file(soup.prettify(), 'drug_page.html')
     test_res = get_data(soup)
     write_file(test_res, fname='test_1.json')
+
     print(test_res['Components'])
     print('---')
     print(test_res['Forms'])
@@ -280,7 +317,6 @@ if __name__ == "__main__":
     main()
     #test_components()
     #collect_forms()
- 
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
 
