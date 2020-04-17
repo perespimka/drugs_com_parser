@@ -280,6 +280,7 @@ def main2():
         all_links = json.load(f)
     list_of_letters = ['r', 'q', 'v']
     for letter in list_of_letters:
+        result = []#Список из словарей, получаемых get_data 
         for link in all_links[letter]:
             soup = BeautifulSoup(get_html(link), 'lxml')
             result.append(get_data(soup))
@@ -308,7 +309,8 @@ def collect_forms():
 
 if __name__ == "__main__":
     #main()
-    test_components(URL2)
+    main2()
+    #test_components(URL2)
     #collect_forms()
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')

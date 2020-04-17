@@ -2,22 +2,50 @@ import csv
 import json
 from rxlist_collect_links import write_file
 
-field_names = ['Drug name', 'Components', 'Forms', 'Therapeutic indications', 'Dosage (Posology) and method of administration', 'Contraindications',
+field_names = ['Drug name', 'Components', 'Forms', 'First paragraph forms', 'Therapeutic indications', 
+               'Dosage (Posology) and method of administration', 'Contraindications',
                'Special warnings and precautions for use', 'Interaction with other medicinal products and other forms of interaction',
                'Undesirable effects', 'Overdose', 'Pharmacodynamic properties', 'Special precautions for disposal and other handling',
                'Date of revision of the text'
 ]
 
+FILENAMES_FOR_REC = {
+    'rxlist_r_data_json.json': 'rxlist_results_r.csv',
+    'rxlist_q_data_json.json': 'rxlist_results_q.csv',
+    'rxlist_v_data_json.json': 'rxlist_results_v.csv',
+}
+letters = ['r', 'q', 'v']
+def from_json_to_csv_multi():
+    for letter in letters:
+        json_fname = f'rxlist_{letter}_data_json.json'
+        csv_fname = f'rxlist_results_{letter}.csv'
+        with open(json_fname) as f:
+            drugs_lst = json.load(f)
+        with open(csv_fname, 'w') as f:
+            writer = csv.DictWriter(f, fieldnames=field_names)
+            writer.writeheader()
+            for drug_dict in drugs_lst:
+                writer.writerow(drug_dict)
 
 def from_json_to_csv():
-    with open('rxlist_r_data_json.json') as f:
+    for key, value in FILENAMES_FOR_REC.items():
+        with open(key) as f:
+            drugs_lst = json.load(f)
+        with open(value, 'w') as f:
+            writer = csv.DictWriter(f, fieldnames=field_names)
+            writer.writeheader()
+            for drug_dict in drugs_lst:
+                writer.writerow(drug_dict)
+        
+    '''
+    with open('rxlist_q_data_json.json') as f:
         drugs_lst = json.load(f)
-    with open('rxlist_results_r.csv', 'w') as f:
+    with open('rxlist_results_q.csv', 'w') as f:
         writer = csv.DictWriter(f, fieldnames=field_names)
         writer.writeheader()
         for drug_dict in drugs_lst:
             writer.writerow(drug_dict)
-
+    '''
 def links_starting_of(letter):
     with open('rxlist_links_dict_nodoubles.json') as f:
         all_links = json.load(f)
@@ -25,7 +53,7 @@ def links_starting_of(letter):
     return links
 
 def main():
-    from_json_to_csv()
+    from_json_to_csv_multi()
 
 def rewrite_list_of_forms():
     new_list = []
@@ -331,7 +359,209 @@ q_links = [
         "https://www.rxlist.com/quillivant-xr-drug.htm",
         "https://www.rxlist.com/quzyttir-drug.htm"
     ]
-
+v_links = [
+        "https://www.rxlist.com/trintellix-drug.htm",
+        "https://www.rxlist.com/navelbine-drug.htm",
+        "https://www.rxlist.com/vogelxo-drug.htm",
+        "https://www.rxlist.com/vimizim-drug.htm",
+        "https://www.rxlist.com/verdeso-drug.htm",
+        "https://www.rxlist.com/vitekta-drug.htm",
+        "https://www.rxlist.com/marqibo-drug.htm",
+        "https://www.rxlist.com/videx-ec-drug.htm",
+        "https://www.rxlist.com/levitra-drug.htm",
+        "https://www.rxlist.com/vitrakvi-drug.htm",
+        "https://www.rxlist.com/visipaque-drug.htm",
+        "https://www.rxlist.com/vascor-drug.htm",
+        "https://www.rxlist.com/vyzulta-drug.htm",
+        "https://www.rxlist.com/vivlodex-drug.htm",
+        "https://www.rxlist.com/vyleesi-drug.htm",
+        "https://www.rxlist.com/viorele-drug.htm",
+        "https://www.rxlist.com/verelan-pm-drug.htm",
+        "https://www.rxlist.com/vicodin-drug.htm",
+        "https://www.rxlist.com/viekira-pak-drug.htm",
+        "https://www.rxlist.com/vascepa-drug.htm",
+        "https://www.rxlist.com/valium-drug.htm",
+        "https://www.rxlist.com/vantrela-er-drug.htm",
+        "https://www.rxlist.com/calan-drug.htm",
+        "https://www.rxlist.com/zenate-prenatal-drug.htm",
+        "https://www.rxlist.com/vantas-drug.htm",
+        "https://www.rxlist.com/vpriv-drug.htm",
+        "https://www.rxlist.com/ascorbic-acid-drug.htm",
+        "https://www.rxlist.com/voltaren-drug.htm",
+        "https://www.rxlist.com/vasotec-drug.htm",
+        "https://www.rxlist.com/aquasol-a-drug.htm",
+        "https://www.rxlist.com/oxbryta-drug.htm",
+        "https://www.rxlist.com/vayarol-drug.htm",
+        "https://www.rxlist.com/zelboraf-drug.htm",
+        "https://www.rxlist.com/vecuronium-bromide-drug.htm",
+        "https://www.rxlist.com/vigadrone-drug.htm",
+        "https://www.rxlist.com/prexxartan-drug.htm",
+        "https://www.rxlist.com/velphoro-drug.htm",
+        "https://www.rxlist.com/vincristine-sulfate-injection-drug.htm",
+        "https://www.rxlist.com/vepesid-drug.htm",
+        "https://www.rxlist.com/viekira-xr-drug.htm",
+        "https://www.rxlist.com/viokase-drug.htm",
+        "https://www.rxlist.com/visionblue-drug.htm",
+        "https://www.rxlist.com/vituz-drug.htm",
+        "https://www.rxlist.com/veregen-drug.htm",
+        "https://www.rxlist.com/vonvendi-drug.htm",
+        "https://www.rxlist.com/vimovo-drug.htm",
+        "https://www.rxlist.com/mepsevii-drug.htm",
+        "https://www.rxlist.com/cnj-016-drug.htm",
+        "https://www.rxlist.com/brintellix-drug.htm",
+        "https://www.rxlist.com/valtrex-drug.htm",
+        "https://www.rxlist.com/vicodin-es-drug.htm",
+        "https://www.rxlist.com/vigiv-drug.htm",
+        "https://www.rxlist.com/vitravene-drug.htm",
+        "https://www.rxlist.com/vaxelis-drug.htm",
+        "https://www.rxlist.com/vimpat-drug.htm",
+        "https://www.rxlist.com/vivotif-drug.htm",
+        "https://www.rxlist.com/entyvio-drug.htm",
+        "https://www.rxlist.com/vivitrol-drug.htm",
+        "https://www.rxlist.com/chantix-drug.htm",
+        "https://www.rxlist.com/venclexta-drug.htm",
+        "https://www.rxlist.com/vermox-drug.htm",
+        "https://www.rxlist.com/valcyte-drug.htm",
+        "https://www.rxlist.com/varivax-drug.htm",
+        "https://www.rxlist.com/zontivity-drug.htm",
+        "https://www.rxlist.com/vyvanse-drug.htm",
+        "https://www.rxlist.com/vistaril-drug.htm",
+        "https://www.rxlist.com/valchlor-drug.htm",
+        "https://www.rxlist.com/varibar-nectar-drug.htm",
+        "https://www.rxlist.com/visudyne-drug.htm",
+        "https://www.rxlist.com/vazculep-drug.htm",
+        "https://www.rxlist.com/volumen-drug.htm",
+        "https://www.rxlist.com/vaxchora-drug.htm",
+        "https://www.rxlist.com/viibryd-drug.htm",
+        "https://www.rxlist.com/varibar-honey-drug.htm",
+        "https://www.rxlist.com/velosulin-drug.htm",
+        "https://www.rxlist.com/viroptic-drug.htm",
+        "https://www.rxlist.com/versacloz-drug.htm",
+        "https://www.rxlist.com/vaseretic-drug.htm",
+        "https://www.rxlist.com/diovan-hct-drug.htm",
+        "https://www.rxlist.com/vigamox-drug.htm",
+        "https://www.rxlist.com/vibativ-drug.htm",
+        "https://www.rxlist.com/veltin-drug.htm",
+        "https://www.rxlist.com/vayarin-drug.htm",
+        "https://www.rxlist.com/vesicare-drug.htm",
+        "https://www.rxlist.com/vaqta-drug.htm",
+        "https://www.rxlist.com/vandazole-drug.htm",
+        "https://www.rxlist.com/viagra-drug.htm",
+        "https://www.rxlist.com/vibramycin-iv-drug.htm",
+        "https://www.rxlist.com/viracept-drug.htm",
+        "https://www.rxlist.com/vumerity-drug.htm",
+        "https://www.rxlist.com/vyxeos-drug.htm",
+        "https://www.rxlist.com/varubi-drug.htm",
+        "https://www.rxlist.com/valstar-drug.htm",
+        "https://www.rxlist.com/vemlidy-drug.htm",
+        "https://www.rxlist.com/vicoprofen-drug.htm",
+        "https://www.rxlist.com/voltaren-xr-drug.htm",
+        "https://www.rxlist.com/vagifem-drug.htm",
+        "https://www.rxlist.com/vaprisol-drug.htm",
+        "https://www.rxlist.com/vivactil-drug.htm",
+        "https://www.rxlist.com/viramune-xr-drug.htm",
+        "https://www.rxlist.com/vitamin-k1-injection-drug.htm",
+        "https://www.rxlist.com/luxturna-drug.htm",
+        "https://www.rxlist.com/victoza-drug.htm",
+        "https://www.rxlist.com/vfend-drug.htm",
+        "https://www.rxlist.com/vistide-drug.htm",
+        "https://www.rxlist.com/voluven-drug.htm",
+        "https://www.rxlist.com/macrilen-drug.htm",
+        "https://www.rxlist.com/veramyst-drug.htm",
+        "https://www.rxlist.com/verelan-drug.htm",
+        "https://www.rxlist.com/metanx-drug.htm",
+        "https://www.rxlist.com/viramune-drug.htm",
+        "https://www.rxlist.com/wilate-drug.htm",
+        "https://www.rxlist.com/vraylar-drug.htm",
+        "https://www.rxlist.com/isoptin-drug.htm",
+        "https://www.rxlist.com/vivelle-dot-drug.htm",
+        "https://www.rxlist.com/vasostrict-drug.htm",
+        "https://www.rxlist.com/zolinza-drug.htm",
+        "https://www.rxlist.com/valtoco-drug.htm",
+        "https://www.rxlist.com/vexol-drug.htm",
+        "https://www.rxlist.com/veltassa-drug.htm",
+        "https://www.rxlist.com/varizig-drug.htm",
+        "https://www.rxlist.com/vyndaqel-and-vyndamax-drug.htm",
+        "https://www.rxlist.com/viread-drug.htm",
+        "https://www.rxlist.com/vyepti-drug.htm",
+        "https://www.rxlist.com/vira-a-drug.htm",
+        "https://www.rxlist.com/vagistat-1-drug.htm",
+        "https://www.rxlist.com/voraxaze-drug.htm",
+        "https://www.rxlist.com/velcade-drug.htm",
+        "https://www.rxlist.com/varithena-drug.htm",
+        "https://www.rxlist.com/vyfemla-drug.htm",
+        "https://www.rxlist.com/victrelis-drug.htm",
+        "https://www.rxlist.com/vibramycin-drug.htm",
+        "https://www.rxlist.com/pitressin-drug.htm",
+        "https://www.rxlist.com/diovan-drug.htm",
+        "https://www.rxlist.com/ventolin-hfa-drug.htm",
+        "https://www.rxlist.com/verzenio-drug.htm",
+        "https://www.rxlist.com/firvanq-drug.htm",
+        "https://www.rxlist.com/vabomere-drug.htm",
+        "https://www.rxlist.com/votrient-drug.htm",
+        "https://www.rxlist.com/vasocidin-drug.htm",
+        "https://www.rxlist.com/vasovist-drug.htm",
+        "https://www.rxlist.com/vosevi-drug.htm",
+        "https://www.rxlist.com/bextra-drug.htm",
+        "https://www.rxlist.com/vectical-drug.htm",
+        "https://www.rxlist.com/vienva-drug.htm",
+        "https://www.rxlist.com/ventolin-solution-drug.htm",
+        "https://www.rxlist.com/vitrase-drug.htm",
+        "https://www.rxlist.com/depacon-drug.htm",
+        "https://www.rxlist.com/vincasar-pfs-drug.htm",
+        "https://www.rxlist.com/vusion-drug.htm",
+        "https://www.rxlist.com/vidaza-drug.htm",
+        "https://www.rxlist.com/stavzor-drug.htm",
+        "https://www.rxlist.com/vivaglobin-drug.htm",
+        "https://www.rxlist.com/effexor-xr-drug.htm",
+        "https://www.rxlist.com/calan-sr-drug.htm",
+        "https://www.rxlist.com/vospire-er-drug.htm",
+        "https://www.rxlist.com/veletri-drug.htm",
+        "https://www.rxlist.com/ingrezza-drug.htm",
+        "https://www.rxlist.com/virazole-drug.htm",
+        "https://www.rxlist.com/vistogard-drug.htm",
+        "https://www.rxlist.com/voltaren-ophthalmic-drug.htm",
+        "https://www.rxlist.com/vancomycin-injection-drug.htm",
+        "https://www.rxlist.com/erivedge-drug.htm",
+        "https://www.rxlist.com/visicol-drug.htm",
+        "https://www.rxlist.com/valturna-drug.htm",
+        "https://www.rxlist.com/vicodin-hp-drug.htm",
+        "https://www.rxlist.com/vyondys-53-drug.htm",
+        "https://www.rxlist.com/vumon-drug.htm",
+        "https://www.rxlist.com/covera-hs-drug.htm",
+        "https://www.rxlist.com/vectibix-drug.htm",
+        "https://www.rxlist.com/valtropin-drug.htm",
+        "https://www.rxlist.com/ventolin-syrup-drug.htm",
+        "https://www.rxlist.com/sabril-drug.htm",
+        "https://www.rxlist.com/caprelsa-drug.htm",
+        "https://www.rxlist.com/vaniqa-drug.htm",
+        "https://www.rxlist.com/varibar-thin-liquid-drug.htm",
+        "https://www.rxlist.com/vizamyl-drug.htm",
+        "https://www.rxlist.com/triple-vita-drops-with-fluoride-drug.htm",
+        "https://www.rxlist.com/vesanoid-drug.htm",
+        "https://www.rxlist.com/vinblastine-sulfate-drug.htm",
+        "https://www.rxlist.com/depakene-drug.htm",
+        "https://www.rxlist.com/vanos-drug.htm",
+        "https://www.rxlist.com/viberzi-drug.htm",
+        "https://www.rxlist.com/venofer-drug.htm",
+        "https://www.rxlist.com/vantin-drug.htm",
+        "https://www.rxlist.com/vioxx-drug.htm",
+        "https://www.rxlist.com/staxyn-drug.htm",
+        "https://www.rxlist.com/ventavis-drug.htm",
+        "https://www.rxlist.com/viadur-drug.htm",
+        "https://www.rxlist.com/vytone-drug.htm",
+        "https://www.rxlist.com/aci-jel-drug.htm",
+        "https://www.rxlist.com/vecamyl-drug.htm",
+        "https://www.rxlist.com/visken-drug.htm",
+        "https://www.rxlist.com/voltaren-gel-drug.htm",
+        "https://www.rxlist.com/vizimpro-drug.htm",
+        "https://www.rxlist.com/vitrasert-drug.htm",
+        "https://www.rxlist.com/vytorin-drug.htm",
+        "https://www.rxlist.com/videx-drug.htm",
+        "https://www.rxlist.com/verapamil-hydrochloride-drug.htm",
+        "https://www.rxlist.com/viokace-drug.htm",
+        "https://www.rxlist.com/effexor-drug.htm"
+    ]
 
 FORMS_LIST = [
     "dental cone",
@@ -371,7 +601,6 @@ FORMS_LIST = [
     "spirit",
     "patch",
     "ear drops",
-    "pills",
     "tincture",
     "rectal suppositories",
     "inhalation solution",
@@ -386,4 +615,42 @@ FORMS_LIST = [
     "suppository",
     "atomizer",
     "cream"
+]
+
+SMALL_FORMS_LIST = [
+    "aerosol",
+    "aerosol spray",
+    "aromatic water",
+    "atomizer",
+    "capsule",
+    "collodion",
+    "dental cone",
+    "dusting powder",
+    "ear drops",
+    "eye drops",
+    "granule",
+    "inhalation solution",
+    "injectable gel",
+    "irrigation solution",
+    "liniment",
+    "liquid preparation",
+    "nasal drops",
+    "nasal spray",
+    "ointment",
+    "ophthalmic emulsion",
+    "ophthalmic solution",
+    "oral solution",
+    "pastille",
+    "patch",
+    "pessary",
+    "powder",
+    "pressurized dispenser",
+    "rectal suppositories",
+    "rectal suspension enema",
+    "single-dose delivery system",
+    "spirit",
+    "suppository",
+    "tablet",
+    "tincture",
+    "transdermal system"
 ]
