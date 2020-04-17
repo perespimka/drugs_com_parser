@@ -4,8 +4,9 @@ from bs4 import BeautifulSoup
 from rxlist_collect_links import write_file, get_html
 import re
 from bs4 import element
-from rxlist_write_csv import q_links, r_links, FORMS_LIST
+from rxlist_write_csv import FORMS_LIST, SMALL_FORMS_LIST
 import logging
+import json
 
 logging.basicConfig(filename='log.txt', level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 
@@ -25,9 +26,10 @@ URL4 = 'https://www.rxlist.com/gardasil-drug.htm'
 URL5 = 'https://www.rxlist.com/qnasl-drug.htm'
 URL6 = 'https://www.rxlist.com/atryn-drug.htm'
 URL7 = 'https://www.rxlist.com/ragwitek-drug.htm'
-URL8 = 'https://www.rxlist.com/zantac-drug.htm'
+URL8 = 'https://www.rxlist.com/quadracel-drug.htm'
 URL9 = 'https://www.rxlist.com/refludan-drug.htm'
 URL10 = 'https://www.rxlist.com/ryzolt-drug.htm'
+URL11 = 'https://www.rxlist.com/renvela-drug.htm'
 
 def clean_string_from_shit(string):
     '''Очистка от переносов строк и лишних пробелов'''
@@ -47,22 +49,19 @@ def components_and_form_re(raw_components):
         Функция для первого блока pgContent. Принимает текст абзаца.
         Регуляркой находим компоненты   препарата и заменяем and
     '''
-    
     #raw_components = clean_string_from_shit(raw_components)
     raw_components = raw_components.replace('[', '(')
     raw_components = raw_components.replace(']', ')')
-    pattern = r'^\((.+)\)'
-        
+    pattern = r'^\((.+)\)(.*)'
     try:
-        components = re.search(pattern, raw_components, flags=re.MULTILINE).group(1)
+        components, paragraph_forms = re.search(pattern, raw_components, flags=re.MULTILINE | re.DOTALL).groups()
         components = clean_and(components)
         # Проверям на закрытые скобки, добавляем ")", если не хватает
         if components.count('(') > components.count(')'):
             components += ')'
     except AttributeError as er:
-
         return None
-    return {'Components': components}
+    return {'Components': components, 'First paragraph forms': paragraph_forms}
       
 
 def combine_data(first_block_iter):
@@ -70,7 +69,7 @@ def combine_data(first_block_iter):
     Сбор данных для первого блока
     Объединяем данные из абзацев, где могут содержаться components  (в случае, если препарат комбинированный)
     '''
-    result = {'Components':  ''}
+    result = {'Components':  '', 'First paragraph forms': ''}
     try:
         for tag in first_block_iter:
             if tag.name == 'a':
@@ -80,15 +79,14 @@ def combine_data(first_block_iter):
                     comps_and_forms = components_and_form_re(tag.text)
                     # Сложим строки в случае, если препарат многокомпонентный.
                     if comps_and_forms:
+                        comps_and_forms['First paragraph forms'] = clean_string_from_shit(comps_and_forms['First paragraph forms'])
                         for key, val in comps_and_forms.items():
                             if result[key]:
                                 result[key] += ', ' + val
                             else:
                                 result[key] = val
-
     except Exception as e:
         logging.debug(f'Ошибка в combine_data: {e}')
-
     return result
 
 
@@ -143,7 +141,8 @@ def get_data_from_pgContent(pgContent):
                     tag_text = tag.text
                     key = FIELD_CONVERTS[tag_text] #Присваиваем имя поля в таблице как указано в ТЗ (в FIELD_CONVERTS это значения по ключам-разделам сайта)
                     if key: # Проверим, нужен ли нам этот раздел сайта (Есть значение по ключу-разделу сайта в FIELD_CONVERTS)
-                        result[key] = ''
+                        if key not in result:
+                            result[key] = ''
                     #Значения разделов WARNINGS и PRECAUTIONS должны объединяться
                     if tag_text == 'WARNINGS' or tag_text == 'PRECAUTIONS':
                         result[key] += f'<h3>{tag_text}</h3>'
@@ -161,11 +160,9 @@ def get_data_from_pgContent(pgContent):
                             attrs_cleaner(table_tag) 
                     '''
                     attrs_cleaner(tag) 
-                    
                     for taggy in tag.descendants:
                         attrs_cleaner(taggy)
                     result[key] += str(tag).strip() # Сохраняем с разметкой.
-
     return result
 
 """
@@ -180,13 +177,14 @@ def get_all_headers(pgContent):
 """
 #HEADERS = set()
 
-def try_to_find_forms(string):
+def try_to_find_forms(string, FORMS_LIST):
     '''Проверяем строку на наличие известных форм, возвращаем список найденных форм'''
     result = []
-    string = string.lower()
-    for form in FORMS_LIST:
-        if form in string:
-            result.append(form)
+    if string:
+        string = string.lower()
+        for form in FORMS_LIST:
+            if form in string:
+                result.append(form)
     return result
 
 def form_finder(soup, drug_data):
@@ -198,32 +196,20 @@ def form_finder(soup, drug_data):
     drug_data['Forms'] = ''
     generic_name_tag = soup.find('li', attrs={'itemprop': 'name'}).span
     generic_name = generic_name_tag.text
-    result.extend(try_to_find_forms(generic_name))
+    result.extend(try_to_find_forms(generic_name, FORMS_LIST))
     if len(result) > 0:
         drug_data['Forms'] = ', '.join(list(set(result)))
         for form in result:
             pattern = f'({form})' + r'(s{0,1})' #Убираем s в конце слова, например tablets, capsules
             generic_name = re.sub(pattern, '', generic_name)
-
         generic_name_tag.string = generic_name
-
     else:
-    
-        for tag in soup.find('div', attrs={'class': 'pgContent'}).children:
-            try:
-                if tag.name == 'a':
-                    break
-                else:
-                    if tag.name == 'p':
-                        result.extend(try_to_find_forms(tag.text))
-            except:
-                pass
-
+        result.extend(try_to_find_forms(drug_data['First paragraph forms'], FORMS_LIST))
         if len(result) > 0:
             drug_data['Forms'] = ', '.join(list(set(result))) 
         else:
             try:
-                result.extend(try_to_find_forms(drug_data['Special precautions for disposal and other handling']))
+                result.extend(try_to_find_forms(drug_data['Special precautions for disposal and other handling'], SMALL_FORMS_LIST))
                 drug_data['Forms'] = ', '.join(list(set(result))) 
             except:
                 pass
@@ -283,20 +269,28 @@ def get_data(soup):
 def main():
     
     result = [] 
-    for link in q_links:
+    for link in v_links:
         soup = BeautifulSoup(get_html(link), 'lxml')
         result.append(get_data(soup))
         
-    write_file(result, fname='rxlist_q_data_json.json')
+    write_file(result, fname='rxlist_v_data_json.json')
 
+def main2():
+    with open('rxlist_links_dict_nodoubles.json') as f:
+        all_links = json.load(f)
+    list_of_letters = ['r', 'q', 'v']
+    for letter in list_of_letters:
+        for link in all_links[letter]:
+            soup = BeautifulSoup(get_html(link), 'lxml')
+            result.append(get_data(soup))
+        write_file(result, fname=f'rxlist_{letter}_data_json.json')
 
 # TESTS 
-def test_components():
-    soup = BeautifulSoup(get_html(URL9), 'lxml')
+def test_components(url):
+    soup = BeautifulSoup(get_html(url), 'lxml')
     write_file(soup.prettify(), 'drug_page.html')
     test_res = get_data(soup)
     write_file(test_res, fname='test_1.json')
-
     print(test_res['Components'])
     print('---')
     print(test_res['Forms'])
@@ -313,9 +307,8 @@ def collect_forms():
     write_file(result, fname='list_of_forms2.json')
 
 if __name__ == "__main__":
-
-    main()
-    #test_components()
+    #main()
+    test_components(URL2)
     #collect_forms()
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
