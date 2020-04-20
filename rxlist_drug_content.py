@@ -7,6 +7,7 @@ from bs4 import element
 from rxlist_write_csv import FORMS_LIST, SMALL_FORMS_LIST
 import logging
 import json
+import copy
 
 logging.basicConfig(filename='log.txt', level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 
@@ -23,9 +24,9 @@ URL = "https://www.rxlist.com/zagam-drug.htm"
 URL2 = 'https://www.rxlist.com/pegintron-and-rebetol-drug.htm'
 URL3 = 'https://www.rxlist.com/quinidex-drug.htm'
 URL4 = 'https://www.rxlist.com/gardasil-drug.htm'
-URL5 = 'https://www.rxlist.com/qnasl-drug.htm'
-URL6 = 'https://www.rxlist.com/quinidine-injection-drug.htm'
-URL7 = 'https://www.rxlist.com/ragwitek-drug.htm'
+URL5 = 'https://www.rxlist.com/xarelto-drug.htm'
+URL6 = 'https://www.rxlist.com/viadur-drug.htm'
+URL7 = 'https://www.rxlist.com/navelbine-drug.htm'
 URL8 = 'https://www.rxlist.com/quadracel-drug.htm'
 URL9 = 'https://www.rxlist.com/refludan-drug.htm'
 URL10 = 'https://www.rxlist.com/ryzolt-drug.htm'
@@ -44,11 +45,20 @@ def clean_and(components):
     components = components.replace(' and ', ', ')
     return components
 
-def components_and_form_re(raw_components):
+def components_and_form_re(tag):
     '''
-        Функция для первого блока pgContent. Принимает текст абзаца.
+        Функция для первого блока pgContent. Принимает абзац.
         Регуляркой находим компоненты   препарата и заменяем and
     '''
+    # Из копии первого абзаца вырезаем тег <b>, так как парсер часто проглатывает тег <br> и проверка начала строки перед скобками не выполняется
+    # Поиск выполняем по копии
+    tags_copy = copy.copy(tag)
+    try:
+        tags_copy.b.decompose()
+    except:
+        logging.info('В первом абзаце отсутствует тег <b>')
+    raw_components = tags_copy.text
+
     #raw_components = clean_string_from_shit(raw_components)
     raw_components = raw_components.replace('[', '(')
     raw_components = raw_components.replace(']', ')')
@@ -74,17 +84,16 @@ def combine_data(first_block_iter):
         for tag in first_block_iter:
             if tag.name == 'a':
                 break
-            else:
-                if tag.name == 'p':
-                    comps_and_forms = components_and_form_re(tag.text)
-                    # Сложим строки в случае, если препарат многокомпонентный.
-                    if comps_and_forms:
-                        comps_and_forms['First paragraph forms'] = clean_string_from_shit(comps_and_forms['First paragraph forms'])
-                        for key, val in comps_and_forms.items():
-                            if result[key]:
-                                result[key] += ', ' + val
-                            else:
-                                result[key] = val
+            elif tag.name == 'p':
+                comps_and_forms = components_and_form_re(tag)
+                # Сложим строки в случае, если препарат многокомпонентный.
+                if comps_and_forms:
+                    comps_and_forms['First paragraph forms'] = clean_string_from_shit(comps_and_forms['First paragraph forms'])
+                    for key, val in comps_and_forms.items():
+                        if result[key]:
+                            result[key] += ', ' + val
+                        else:
+                            result[key] = val
     except Exception as e:
         logging.debug(f'Ошибка в combine_data: {e}')
     return result
@@ -130,10 +139,11 @@ def get_data_from_pgContent(pgContent):
     '''Собираем данные из одного блока. Возвращает словарь, ключ - имя поля таблицы описания препарата, значение - содержимое раздела'''
     result = {} # ключ - имя поля в таблице, значение - содержимое раздела
     key = None # Переменная, определяющая в какой ключ словаря мы сохраняем содержимое тега. Если None - не сохраняем
+    '''
     p_with_align = pgContent.find_all('p', attrs={'align': 'center'}) #Ошибка soup, тег p align="center" не закрывается там, где должен. необходимо его развернуть
     for p in p_with_align:
         p.unwrap()
-    
+    '''
     for tag in pgContent.children:
         if isinstance(tag, element.Tag):
             if tag.name == 'h3':
@@ -149,7 +159,7 @@ def get_data_from_pgContent(pgContent):
                 else:
                     key = None
             elif key:
-                if tag.name in ['p', 'h4', 'h5', 'ul', 'center']:
+                if tag.name in ['p', 'h4', 'h5', 'ul', 'center', 'b']:
                     link_cleaner(tag) # Чистим ссылки
                     cut_section_links_1(tag)
                     '''
@@ -221,10 +231,16 @@ def get_drug_name(pgContent, drug_data, soup):
         if tag.name == 'p':
             #Есть страницы, где нет имени и компонентов/форм в разделах. В таком случае возьмем из заголовка страницы имя препарата
             try:
-                drug_data['Drug name'] = tag.b.text.strip()
+                name_from_p = tag.b.text.strip() # drug_data['Drug name']
             except:
-                drug_data['Drug name'] = soup.h1.text
-                logging.info(f'Имя {drug_data["Drug name"]} взято из резервного источника')
+                name_from_p = soup.h1.text
+            name_from_h = soup.h1.text
+            if len(name_from_p) > 31:
+                drug_data['Drug name'] = name_from_h
+            else:
+                drug_data['Drug name'] = name_from_p
+                #logging.info(f'Имя {drug_data["Drug name"]} взято из резервного источника')
+
             break  
     
 
@@ -295,8 +311,8 @@ def collect_forms():
     write_file(result, fname='list_of_forms2.json')
 
 if __name__ == "__main__":
-    main()
-    #test_components(URL6)
+    #main()
+    test_components(URL2)
     #collect_forms()
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
