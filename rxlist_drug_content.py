@@ -24,7 +24,7 @@ URL2 = 'https://www.rxlist.com/pegintron-and-rebetol-drug.htm'
 URL3 = 'https://www.rxlist.com/quinidex-drug.htm'
 URL4 = 'https://www.rxlist.com/gardasil-drug.htm'
 URL5 = 'https://www.rxlist.com/qnasl-drug.htm'
-URL6 = 'https://www.rxlist.com/atryn-drug.htm'
+URL6 = 'https://www.rxlist.com/quinidine-injection-drug.htm'
 URL7 = 'https://www.rxlist.com/ragwitek-drug.htm'
 URL8 = 'https://www.rxlist.com/quadracel-drug.htm'
 URL9 = 'https://www.rxlist.com/refludan-drug.htm'
@@ -52,7 +52,7 @@ def components_and_form_re(raw_components):
     #raw_components = clean_string_from_shit(raw_components)
     raw_components = raw_components.replace('[', '(')
     raw_components = raw_components.replace(']', ')')
-    pattern = r'^\((.+)\)(.*)'
+    pattern = r'^\s*\((.+)\)(.*)'
     try:
         components, paragraph_forms = re.search(pattern, raw_components, flags=re.MULTILINE | re.DOTALL).groups()
         components = clean_and(components)
@@ -242,11 +242,6 @@ def get_data(soup):
     pgContent_blocks = soup.find_all('div', attrs={'class': 'pgContent'})
     drug_data.update(combine_data(pgContent_blocks[0].children)) #Из первого блока берем components и forms
     get_drug_name(pgContent_blocks[0], drug_data, soup)
-    #Если данные о компонентах в первом разделе не найдены, возмем их из заголовка
-    if not drug_data['Components']:
-        components = soup.find('li', attrs={'itemprop': 'name'}).span.text
-        drug_data['Components'] = clean_and(components)
-
     last_reviewed = soup.find('div', attrs={'class':'monolastreviewed'}).span.text #Дата релиза описания на сайте
     drug_data['Date of revision of the text'] = last_reviewed
     #Перебираем блоки pgContent начиная со второго
@@ -266,16 +261,8 @@ def get_data(soup):
    
     return drug_data
 
-def main():
-    
-    result = [] 
-    for link in v_links:
-        soup = BeautifulSoup(get_html(link), 'lxml')
-        result.append(get_data(soup))
-        
-    write_file(result, fname='rxlist_v_data_json.json')
 
-def main2():
+def main():
     with open('rxlist_links_dict_nodoubles.json') as f:
         all_links = json.load(f)
     list_of_letters = ['r', 'q', 'v']
@@ -308,9 +295,8 @@ def collect_forms():
     write_file(result, fname='list_of_forms2.json')
 
 if __name__ == "__main__":
-    #main()
-    main2()
-    #test_components(URL2)
+    main()
+    #test_components(URL6)
     #collect_forms()
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
