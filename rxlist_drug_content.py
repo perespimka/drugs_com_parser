@@ -62,16 +62,21 @@ def components_and_form_re(tag):
     #raw_components = clean_string_from_shit(raw_components)
     raw_components = raw_components.replace('[', '(')
     raw_components = raw_components.replace(']', ')')
-    pattern = r'^\s*\((.+)\)(.*)'
-    try:
-        components, paragraph_forms = re.search(pattern, raw_components, flags=re.MULTILINE | re.DOTALL).groups()
-        components = clean_and(components)
-        # Проверям на закрытые скобки, добавляем ")", если не хватает
-        if components.count('(') > components.count(')'):
-            components += ')'
-    except AttributeError as er:
-        return None
-    return {'Components': components, 'First paragraph forms': paragraph_forms}
+    patterns = (
+        r'^\s*\((.+)\)(.*\(.+\).*)',
+        r'^\s*\((.+)\)(.*)'
+    )
+    for pattern in patterns:
+        search_result = re.search(pattern, raw_components, flags=re.MULTILINE | re.DOTALL)
+        if search_result:
+            components, paragraph_forms = search_result.groups()
+            components = clean_and(components)
+            # Проверям на закрытые скобки, добавляем ")", если не хватает
+            if components.count('(') > components.count(')'):
+                components += ')'
+            return {'Components': components, 'First paragraph forms': paragraph_forms}
+    return None
+
       
 
 def combine_data(first_block_iter):
@@ -224,26 +229,50 @@ def form_finder(soup, drug_data):
             except:
                 pass
 
+def get_brand_name(soup):
+    try:
+        brand_name = soup.find_all('li', attrs={'itemprop': 'name'})[1].span.text
+    except:
+        brand_name = ''
+    return brand_name
+
+def compare_names(*names):
+    '''Из входящих имен оставим непустые, из них выберем кратчайшее'''
+    
+    true_names = [name.strip() for name in names if name]
+    if len(true_names) > 0:
+        min_name = true_names[0]
+        for name in true_names:
+            if len(name) < len(min_name):
+                min_name = name
+        return min_name
+    else:
+        return "NoName"
+            
+
 
 def get_drug_name(pgContent, drug_data, soup):
     '''Из первого блока возьмем первый абзац, в котором содержится имя препарата'''
+    brand_name = get_brand_name(soup).strip()
+    print('*****'*3)
+    print(brand_name)
     for tag in pgContent.children:
         if tag.name == 'p':
             #Есть страницы, где нет имени и компонентов/форм в разделах. В таком случае возьмем из заголовка страницы имя препарата
             try:
                 name_from_p = tag.b.text.strip() # drug_data['Drug name']
+                print(name_from_p)
             except:
-                name_from_p = soup.h1.text
+                name_from_p = brand_name
             name_from_h = soup.h1.text
-            if len(name_from_p) > 31:
-                drug_data['Drug name'] = name_from_h
-            else:
-                drug_data['Drug name'] = name_from_p
-                #logging.info(f'Имя {drug_data["Drug name"]} взято из резервного источника')
-
+            drug_data['Drug name'] =  compare_names(brand_name, name_from_p) 
             break  
     
 
+def get_components(soup, drug_data):
+    components_from_generic = soup.find('li', attrs={'itemprop': 'name'}).span.text
+    components_from_first_p = drug_data['Components']
+    drug_data['Components'] = clean_and(compare_names(components_from_first_p, components_from_generic))
 
 
 def get_data(soup):
@@ -253,7 +282,7 @@ def get_data(soup):
         ключ имя поля таблицы описания, значение - само описание. 
         Расширяем результирующий словарь по препарату drug_data словариками из каждого pgContent
     '''
-
+    get_brand_name(soup)
     drug_data = {} # Сюда собираем все разделы в соответствующие поля (ключи словаря)
     pgContent_blocks = soup.find_all('div', attrs={'class': 'pgContent'})
     drug_data.update(combine_data(pgContent_blocks[0].children)) #Из первого блока берем components и forms
@@ -271,10 +300,7 @@ def get_data(soup):
                  drug_data[key] = data_from_pgContent[key]
 
     form_finder(soup, drug_data) #Поиск форм
-    if not drug_data['Components']: # Дополнительное определение компонентов должно быть после поиска форм, т.к. там вычитаются формы из компонентов в заголовке
-        components = soup.find('li', attrs={'itemprop': 'name'}).span.text
-        drug_data['Components'] = clean_and(components)
-   
+    get_components(soup, drug_data)
     return drug_data
 
 
@@ -311,8 +337,8 @@ def collect_forms():
     write_file(result, fname='list_of_forms2.json')
 
 if __name__ == "__main__":
-    #main()
-    test_components(URL2)
+    main()
+    #test_components(URL2)
     #collect_forms()
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
