@@ -254,14 +254,11 @@ def compare_names(*names):
 def get_drug_name(pgContent, drug_data, soup):
     '''Из первого блока возьмем первый абзац, в котором содержится имя препарата'''
     brand_name = get_brand_name(soup).strip()
-    print('*****'*3)
-    print(brand_name)
     for tag in pgContent.children:
         if tag.name == 'p':
             #Есть страницы, где нет имени и компонентов/форм в разделах. В таком случае возьмем из заголовка страницы имя препарата
             try:
                 name_from_p = tag.b.text.strip() # drug_data['Drug name']
-                print(name_from_p)
             except:
                 name_from_p = brand_name
             name_from_h = soup.h1.text
@@ -273,6 +270,10 @@ def get_components(soup, drug_data):
     components_from_generic = soup.find('li', attrs={'itemprop': 'name'}).span.text
     components_from_first_p = drug_data['Components']
     drug_data['Components'] = clean_and(compare_names(components_from_first_p, components_from_generic))
+
+def letter_gen():
+    for i in range(97,102):
+        yield chr(i)
 
 
 def get_data(soup):
@@ -307,8 +308,8 @@ def get_data(soup):
 def main():
     with open('rxlist_links_dict_nodoubles.json') as f:
         all_links = json.load(f)
-    list_of_letters = ['r', 'q', 'v']
-    for letter in list_of_letters:
+    letters = letter_gen()
+    for letter in letters:
         result = []#Список из словарей, получаемых get_data 
         for link in all_links[letter]:
             soup = BeautifulSoup(get_html(link), 'lxml')
