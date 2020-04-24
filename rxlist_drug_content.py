@@ -28,7 +28,7 @@ URL5 = 'https://www.rxlist.com/xarelto-drug.htm'
 URL6 = 'https://www.rxlist.com/viadur-drug.htm'
 URL7 = 'https://www.rxlist.com/navelbine-drug.htm'
 URL8 = 'https://www.rxlist.com/quadracel-drug.htm'
-URL9 = 'https://www.rxlist.com/refludan-drug.htm'
+URL9 = 'https://www.rxlist.com/nuwiq-drug.htm'
 URL10 = 'https://www.rxlist.com/ryzolt-drug.htm'
 URL11 = 'https://www.rxlist.com/renvela-drug.htm'
 
@@ -196,9 +196,10 @@ def try_to_find_forms(string, FORMS_LIST):
     '''Проверяем строку на наличие известных форм, возвращаем список найденных форм'''
     result = []
     if string:
-        string = string.lower()
         for form in FORMS_LIST:
-            if form in string:
+            pattern = r'\b' + f'{form}' + r's{0,1}' + r'\b'
+            search_result = re.search(pattern, string, flags=re.IGNORECASE)
+            if search_result:
                 result.append(form)
     return result
 
@@ -215,8 +216,8 @@ def form_finder(soup, drug_data):
     if len(result) > 0:
         drug_data['Forms'] = ', '.join(list(set(result)))
         for form in result:
-            pattern = f'({form})' + r'(s{0,1})' #Убираем s в конце слова, например tablets, capsules
-            generic_name = re.sub(pattern, '', generic_name)
+            pattern = r'\b' + f'{form}' + r's{0,1}' + r'\b' #Убираем s в конце слова, например tablets, capsules
+            generic_name = re.sub(pattern, '', generic_name, flags=re.IGNORECASE)
         generic_name_tag.string = generic_name
     else:
         result.extend(try_to_find_forms(drug_data['First paragraph forms'], FORMS_LIST))
@@ -253,7 +254,11 @@ def compare_names(*names):
 
 def get_drug_name(pgContent, drug_data, soup):
     '''Из первого блока возьмем первый абзац, в котором содержится имя препарата'''
-    brand_name = get_brand_name(soup).strip()
+    try:
+        brand_name = get_brand_name(soup).strip()
+    except:
+        brand_name = ''
+    name_from_p = ''
     for tag in pgContent.children:
         if tag.name == 'p':
             #Есть страницы, где нет имени и компонентов/форм в разделах. В таком случае возьмем из заголовка страницы имя препарата
@@ -262,8 +267,9 @@ def get_drug_name(pgContent, drug_data, soup):
             except:
                 name_from_p = brand_name
             name_from_h = soup.h1.text
-            drug_data['Drug name'] =  compare_names(brand_name, name_from_p) 
             break  
+    drug_data['Drug name'] =  compare_names(brand_name, name_from_p) 
+            
     
 
 def get_components(soup, drug_data):
@@ -272,7 +278,7 @@ def get_components(soup, drug_data):
     drug_data['Components'] = clean_and(compare_names(components_from_first_p, components_from_generic))
 
 def letter_gen():
-    for i in range(97,102):
+    for i in range(97,123):
         yield chr(i)
 
 
@@ -283,11 +289,14 @@ def get_data(soup):
         ключ имя поля таблицы описания, значение - само описание. 
         Расширяем результирующий словарь по препарату drug_data словариками из каждого pgContent
     '''
-    get_brand_name(soup)
     drug_data = {} # Сюда собираем все разделы в соответствующие поля (ключи словаря)
     pgContent_blocks = soup.find_all('div', attrs={'class': 'pgContent'})
-    drug_data.update(combine_data(pgContent_blocks[0].children)) #Из первого блока берем components и forms
-    get_drug_name(pgContent_blocks[0], drug_data, soup)
+    try:
+        drug_data.update(combine_data(pgContent_blocks[0].children)) #Из первого блока берем components и forms
+        get_drug_name(pgContent_blocks[0], drug_data, soup)
+    except:
+        logging.info('Страница не содержит блоков pgContent')
+        return None
     last_reviewed = soup.find('div', attrs={'class':'monolastreviewed'}).span.text #Дата релиза описания на сайте
     drug_data['Date of revision of the text'] = last_reviewed
     #Перебираем блоки pgContent начиная со второго
@@ -313,7 +322,9 @@ def main():
         result = []#Список из словарей, получаемых get_data 
         for link in all_links[letter]:
             soup = BeautifulSoup(get_html(link), 'lxml')
-            result.append(get_data(soup))
+            drug_data = get_data(soup)
+            if drug_data:
+                result.append(drug_data)
         write_file(result, fname=f'rxlist_{letter}_data_json.json')
 
 # TESTS 
@@ -322,9 +333,9 @@ def test_components(url):
     write_file(soup.prettify(), 'drug_page.html')
     test_res = get_data(soup)
     write_file(test_res, fname='test_1.json')
-    print(test_res['Components'])
-    print('---')
-    print(test_res['Forms'])
+    #print(test_res['Components'])
+    #print('---')
+    #print(test_res['Forms'])
 
 def collect_forms():
     result = [] 
@@ -339,7 +350,7 @@ def collect_forms():
 
 if __name__ == "__main__":
     main()
-    #test_components(URL2)
+    #test_components(URL7)
     #collect_forms()
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
