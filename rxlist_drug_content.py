@@ -324,16 +324,6 @@ def test_components(url):
     test_res = get_data(soup)
     write_file(test_res, fname='test_1.json')
 
-def collect_forms():
-    result = [] 
-    for link in r_links:
-        soup = BeautifulSoup(get_html(link), 'html.parser')
-        drug_data = {} # Сюда собираем все разделы в соответствующие поля (ключи словаря)
-        pgContent_blocks = soup.find_all('div', attrs={'class': 'pgContent'})
-        drug_data.update(combine_data(pgContent_blocks[0].children))
-        if drug_data['Forms']:
-            result.append(drug_data['Forms'])
-    write_file(result, fname='list_of_forms2.json')
 
 URL = "https://www.rxlist.com/zagam-drug.htm"
 URL2 = 'https://www.rxlist.com/pegintron-and-rebetol-drug.htm'
@@ -350,7 +340,6 @@ URL11 = 'https://www.rxlist.com/alora-drug.htm'
 if __name__ == "__main__":
     main()
     #test_components(URL11)
-    #collect_forms()
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
 
