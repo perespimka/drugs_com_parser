@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import requests
 from bs4 import BeautifulSoup
 from rxlist_collect_links import write_file, get_html
 import re
@@ -8,6 +7,8 @@ from rxlist_write_csv import FORMS_LIST, SMALL_FORMS_LIST
 import logging
 import json
 import copy
+import pandas as pd
+
 
 logging.basicConfig(filename='log.txt', level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 
@@ -20,17 +21,7 @@ FIELD_CONVERTS = {'INDICATIONS': 'Therapeutic indications', 'DESCRIPTION': None,
                   'CONTRAINDICATIONS': 'Contraindications', 'CLINICAL PHARMACOLOGY': 'Pharmacodynamic properties',
                   'PATIENT INFORMATION': None, 'ADVERSE REACTIONS': None
 }
-URL = "https://www.rxlist.com/zagam-drug.htm"
-URL2 = 'https://www.rxlist.com/pegintron-and-rebetol-drug.htm'
-URL3 = 'https://www.rxlist.com/quinidex-drug.htm'
-URL4 = 'https://www.rxlist.com/gardasil-drug.htm'
-URL5 = 'https://www.rxlist.com/xarelto-drug.htm'
-URL6 = 'https://www.rxlist.com/viadur-drug.htm'
-URL7 = 'https://www.rxlist.com/navelbine-drug.htm'
-URL8 = 'https://www.rxlist.com/quadracel-drug.htm'
-URL9 = 'https://www.rxlist.com/nuwiq-drug.htm'
-URL10 = 'https://www.rxlist.com/ryzolt-drug.htm'
-URL11 = 'https://www.rxlist.com/renvela-drug.htm'
+
 
 def clean_string_from_shit(string):
     '''Очистка от переносов строк и лишних пробелов'''
@@ -45,6 +36,9 @@ def clean_and(components):
     components = components.replace(' and ', ', ')
     return components
 
+def replace_square_brackets(string):
+    return string.replace('[', '(').replace(']', ')')
+
 def components_and_form_re(tag):
     '''
         Функция для первого блока pgContent. Принимает абзац.
@@ -58,10 +52,7 @@ def components_and_form_re(tag):
     except:
         logging.info('В первом абзаце отсутствует тег <b>')
     raw_components = tags_copy.text
-
-    #raw_components = clean_string_from_shit(raw_components)
-    raw_components = raw_components.replace('[', '(')
-    raw_components = raw_components.replace(']', ')')
+    raw_components = replace_square_brackets(raw_components)
     patterns = (
         r'^\s*\((.+)\)(.*\(.+\).*)',
         r'^\s*\((.+)\)(.*)'
@@ -120,8 +111,9 @@ def link_to_text(a):
 
 def cut_section_links_1(tag):
     pattern1 = r'\([Ss]ee.+?\)'
-    pattern2 = r'\[[Ss]ee.+?\]'
+    pattern2 = r'[Ss]ee.+\.?'
     string_tag = str(tag)
+    string_tag = replace_square_brackets(string_tag)
     new_string = re.sub(pattern1, '', string_tag, flags=re.DOTALL)
     new_string = re.sub(pattern2, '', new_string, flags=re.DOTALL)
     new_soup = BeautifulSoup(new_string, 'html.parser')
@@ -164,16 +156,9 @@ def get_data_from_pgContent(pgContent):
                 else:
                     key = None
             elif key:
-                if tag.name in ['p', 'h4', 'h5', 'ul', 'center', 'b']:
+                if tag.name in ['p', 'h4', 'h5', 'ul', 'center', 'b', 'ol']:
                     link_cleaner(tag) # Чистим ссылки
                     cut_section_links_1(tag)
-                    '''
-                    tables = tag.find_all('table')
-                    for table in tables:
-                        attrs_cleaner(table)
-                        for table_tag in table.descendants:
-                            attrs_cleaner(table_tag) 
-                    '''
                     attrs_cleaner(tag) 
                     for taggy in tag.descendants:
                         attrs_cleaner(taggy)
@@ -277,8 +262,9 @@ def get_components(soup, drug_data):
     components_from_first_p = drug_data['Components']
     drug_data['Components'] = clean_and(compare_names(components_from_first_p, components_from_generic))
 
-def letter_gen():
-    for i in range(97,123):
+def letter_gen(x,y):
+    '''a-z : range(97,123)'''
+    for i in range(x, y):
         yield chr(i)
 
 
@@ -317,14 +303,18 @@ def get_data(soup):
 def main():
     with open('rxlist_links_dict_nodoubles.json') as f:
         all_links = json.load(f)
-    letters = letter_gen()
+    letters = letter_gen(113, 114) # 97, 223 - все строчные латинские буквы
+    
     for letter in letters:
-        result = []#Список из словарей, получаемых get_data 
+        result = [] #Список из словарей, получаемых get_data 
         for link in all_links[letter]:
             soup = BeautifulSoup(get_html(link), 'lxml')
             drug_data = get_data(soup)
             if drug_data:
                 result.append(drug_data)
+        pd_to_write = pd.DataFrame(result)
+        xlsx_fname = f'rxlist_results_{letter}.xlsx'
+        pd_to_write.to_excel(xlsx_fname, index=None, header=True)
         write_file(result, fname=f'rxlist_{letter}_data_json.json')
 
 # TESTS 
@@ -333,9 +323,6 @@ def test_components(url):
     write_file(soup.prettify(), 'drug_page.html')
     test_res = get_data(soup)
     write_file(test_res, fname='test_1.json')
-    #print(test_res['Components'])
-    #print('---')
-    #print(test_res['Forms'])
 
 def collect_forms():
     result = [] 
@@ -348,9 +335,21 @@ def collect_forms():
             result.append(drug_data['Forms'])
     write_file(result, fname='list_of_forms2.json')
 
+URL = "https://www.rxlist.com/zagam-drug.htm"
+URL2 = 'https://www.rxlist.com/pegintron-and-rebetol-drug.htm'
+URL3 = 'https://www.rxlist.com/quinidex-drug.htm'
+URL4 = 'https://www.rxlist.com/gardasil-drug.htm'
+URL5 = 'https://www.rxlist.com/xarelto-drug.htm'
+URL6 = 'https://www.rxlist.com/viadur-drug.htm'
+URL7 = 'https://www.rxlist.com/navelbine-drug.htm'
+URL8 = 'https://www.rxlist.com/quadracel-drug.htm'
+URL9 = 'https://www.rxlist.com/nuwiq-drug.htm'
+URL10 = 'https://www.rxlist.com/ryzolt-drug.htm'
+URL11 = 'https://www.rxlist.com/alora-drug.htm'
+
 if __name__ == "__main__":
-    main()
-    #test_components(URL7)
+    #main()
+    test_components(URL11)
     #collect_forms()
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
