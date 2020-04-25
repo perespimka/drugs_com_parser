@@ -303,7 +303,7 @@ def get_data(soup):
 def main():
     with open('rxlist_links_dict_nodoubles.json') as f:
         all_links = json.load(f)
-    letters = letter_gen(113, 114) # 97, 223 - все строчные латинские буквы
+    letters = letter_gen(97, 98) # 97, 223 - все строчные латинские буквы
     
     for letter in letters:
         result = [] #Список из словарей, получаемых get_data 
@@ -348,8 +348,8 @@ URL10 = 'https://www.rxlist.com/ryzolt-drug.htm'
 URL11 = 'https://www.rxlist.com/alora-drug.htm'
 
 if __name__ == "__main__":
-    #main()
-    test_components(URL11)
+    main()
+    #test_components(URL11)
     #collect_forms()
     #soup = BeautifulSoup(get_html(URL2), 'html.parser')
     #write_file(get_data(soup), fname='test_drug_data.json')
