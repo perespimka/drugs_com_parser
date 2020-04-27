@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from rxlist_collect_links import write_file, get_html
 import re
 from bs4 import element
-from rxlist_write_csv import FORMS_LIST, SMALL_FORMS_LIST
+from rxlist_write_csv import FORMS_LIST, SMALL_FORMS_LIST, field_names
 import logging
 import json
 import copy
@@ -98,7 +98,7 @@ def combine_data(first_block_iter):
 
 def attrs_cleaner(tag):
     '''Очистка атрибутов'''
-    NAMES_TO_CLEAN = ['class']    
+    NAMES_TO_CLEAN = ['class', 'type']    
     
     if isinstance(tag, element.Tag):
         tag.attrs = { key:val for key,val in tag.attrs.items() if key not in NAMES_TO_CLEAN}
@@ -110,12 +110,12 @@ def link_to_text(a):
     a.replace_with(sub)
 
 def cut_section_links_1(tag):
-    pattern1 = r'\([Ss]ee.+?\)'
-    pattern2 = r'[Ss]ee.+\.?'
+    pattern1 = r'\(see\b.+?\)'
+    pattern2 = r'\bsee\b.+\.?'
     string_tag = str(tag)
     string_tag = replace_square_brackets(string_tag)
-    new_string = re.sub(pattern1, '', string_tag, flags=re.DOTALL)
-    new_string = re.sub(pattern2, '', new_string, flags=re.DOTALL)
+    new_string = re.sub(pattern1, '', string_tag, flags=re.DOTALL | re.IGNORECASE)
+    new_string = re.sub(pattern2, '', new_string, flags=re.DOTALL | re.IGNORECASE)
     new_soup = BeautifulSoup(new_string, 'html.parser')
 
     #tag.replace_with(new_soup)
@@ -312,10 +312,11 @@ def main():
             drug_data = get_data(soup)
             if drug_data:
                 result.append(drug_data)
-        pd_to_write = pd.DataFrame(result)
+        pd_to_write = pd.DataFrame(result, columns=field_names)
         xlsx_fname = f'rxlist_results_{letter}.xlsx'
         pd_to_write.to_excel(xlsx_fname, index=None, header=True)
-        write_file(result, fname=f'rxlist_{letter}_data_json.json')
+        #write_file(result, fname=f'rxlist_{letter}_data_json.json')
+        
 
 # TESTS 
 def test_components(url):
@@ -335,7 +336,7 @@ URL7 = 'https://www.rxlist.com/navelbine-drug.htm'
 URL8 = 'https://www.rxlist.com/quadracel-drug.htm'
 URL9 = 'https://www.rxlist.com/nuwiq-drug.htm'
 URL10 = 'https://www.rxlist.com/ryzolt-drug.htm'
-URL11 = 'https://www.rxlist.com/alora-drug.htm'
+URL11 = 'https://www.rxlist.com/aredia-drug.htm'
 
 if __name__ == "__main__":
     main()
