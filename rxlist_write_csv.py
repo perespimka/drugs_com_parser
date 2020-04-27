@@ -1,6 +1,9 @@
 import csv
 import json
 from rxlist_collect_links import write_file
+import pandas
+
+
 
 field_names = ['Drug name', 'Components', 'Forms', 'First paragraph forms', 'Therapeutic indications', 
                'Dosage (Posology) and method of administration', 'Contraindications',
@@ -14,8 +17,19 @@ FILENAMES_FOR_REC = {
     'rxlist_q_data_json.json': 'rxlist_results_q.csv',
     'rxlist_v_data_json.json': 'rxlist_results_v.csv',
 }
-letters = ['r', 'q', 'v']
+def letter_gen():
+    for i in range(97,123):
+        yield chr(i)
+
+def csv_to_excel(letter):
+    csv_fname = f'rxlist_results_{letter}.csv'
+    xlsx_fname = f'rxlist_results_{letter}.xlsx'
+    csv_file = pandas.read_csv(csv_fname)
+    csv_file.to_excel(xlsx_fname, index=None, header=True)
+
+
 def from_json_to_csv_multi():
+    letters = letter_gen()
     for letter in letters:
         json_fname = f'rxlist_{letter}_data_json.json'
         csv_fname = f'rxlist_results_{letter}.csv'
@@ -26,6 +40,9 @@ def from_json_to_csv_multi():
             writer.writeheader()
             for drug_dict in drugs_lst:
                 writer.writerow(drug_dict)
+        csv_to_excel(letter)    
+
+
 
 def from_json_to_csv():
     for key, value in FILENAMES_FOR_REC.items():

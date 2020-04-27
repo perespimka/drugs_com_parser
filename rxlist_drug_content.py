@@ -32,8 +32,7 @@ def clean_string_from_shit(string):
     return string
 
 def clean_and(components):
-    components = components.replace(', and ', ', ')
-    components = components.replace(' and ', ', ')
+    components = re.sub(r',? and\b', '', components)
     return components
 
 def replace_square_brackets(string):
@@ -303,7 +302,7 @@ def get_data(soup):
 def main():
     with open('rxlist_links_dict_nodoubles.json') as f:
         all_links = json.load(f)
-    letters = letter_gen(97, 98) # 97, 223 - все строчные латинские буквы
+    letters = letter_gen(97, 123) # 97, 123 - все строчные латинские буквы
     
     for letter in letters:
         result = [] #Список из словарей, получаемых get_data 
