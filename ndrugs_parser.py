@@ -18,6 +18,10 @@ TAB_HEADERS= ('Name', 'WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF I
               'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF  SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
               'CR price estimates', 'CR time for results', 'CR reported age'#, 'USES_2', 'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
 )
+MAIN_TAB_HEADERS= ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN DETAILS', 'DESCRIPTION', 'DOSAGE', 'INTERACTIONS', 'SIDE EFFECTS',
+              'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF  SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
+              'CR price estimates', 'CR time for results', 'CR reported age'#, 'USES_2', 'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
+)
 def get_html(url):
     '''Вернем текст страницы '''
     headers = {
@@ -35,7 +39,8 @@ def get_main_tab_data(content, name):
     headers = [header.format(name) for header in HEADERS]
     fields_convert = dict(zip(headers, HEADER_VALUES))
     key = None
-    result = {}
+    result = {col: '' for col in MAIN_TAB_HEADERS}
+    first_brd_tab = True # есть две таблицы одного класса, нам нужна первая
     for tag in content.children:
         if isinstance(tag, element.Tag):
             if tag.name == 'h2':
@@ -49,7 +54,9 @@ def get_main_tab_data(content, name):
                     key = None
             elif tag.name == 'table' and tag.attrs.get('class'):
                 if tag.attrs.get('class')[0] == 'brd':
-                    result['LIST OF  SUBSTITUTES (BRAND AND GENERIC NAMES)'] = str(tag).strip()
+                    if first_brd_tab: # Проверим, первая ли таблица brd
+                        result['LIST OF  SUBSTITUTES (BRAND AND GENERIC NAMES)'] = str(tag).strip()
+                        first_brd_tab = False
                 continue
             elif key:
                 if key == 'REVIEWS':
@@ -57,7 +64,10 @@ def get_main_tab_data(content, name):
                         but = tag.button
                         if but:
                             but.decompose()
+                        empty = False
                         if tag.attrs.get('class')[0] == 'vote_result':
+                            if 'No survey data has been collected yet' in tag.text.strip():
+                                continue        
                             if tag.h4.text.endswith('time for results'):
                                 result['CR time for results'] = str(tag).strip()
                             elif tag.h4.text.endswith('useful'):
@@ -66,7 +76,7 @@ def get_main_tab_data(content, name):
                                 result['CR price estimates'] = str(tag).strip()
                             elif tag.h4.text.endswith('reported age'):
                                 result['CR reported age'] = str(tag).strip()
-                elif tag.name in ['p', 'h3', 'h4', 'h5', 'ul', 'center', 'b', 'ol']:
+                elif tag.name in ['p', 'h3', 'h4', 'h5', 'ul', 'center', 'b', 'ol'] and tag.text:
                     result[key] += str(tag).strip()
                 elif tag.name == 'div' and tag.attrs.get('class'): #обрабатываем блок i
                     if tag.attrs.get('class')[0] == 'item':
@@ -115,7 +125,7 @@ def get_page_data(link):
 
 def sort_drug_values_gen(drug_data):
     for tab_header in TAB_HEADERS:
-        yield drug_data[tab_header]
+        yield drug_data.get(tab_header)
 
 def main():
     link = 'https://www.ndrugs.com/?s=bendazol'
