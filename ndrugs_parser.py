@@ -4,6 +4,7 @@ import logging
 import re
 import requests
 from openpyxl import Workbook
+import sqlite3
 
 
 logging.basicConfig(filename='ndrugs_log.txt', level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
@@ -14,13 +15,13 @@ HEADERS = ('What is {}?', '{} indications', 'How should I use {}?', 'Uses of {} 
 HEADER_VALUES = ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN DETAILS', 'DESCRIPTION', 'DOSAGE', 'INTERACTIONS', 'SIDE EFFECTS',
               'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'REFERENCES', 'REVIEWS'
 )
-TAB_HEADERS= ('Name', 'WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN DETAILS', 'DESCRIPTION', 'DOSAGE', 'INTERACTIONS', 'SIDE EFFECTS',
-              'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF  SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
-              'CR price estimates', 'CR time for results', 'CR reported age'#, 'USES_2', 'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
-)
+TAB_HEADERS= ['Name', 'link', 'WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN DETAILS', 'DESCRIPTION', 'DOSAGE', 'INTERACTIONS', 'SIDE EFFECTS',
+              'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
+              'CR price estimates', 'CR time for results', 'CR reported age',  'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
+]
 MAIN_TAB_HEADERS= ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN DETAILS', 'DESCRIPTION', 'DOSAGE', 'INTERACTIONS', 'SIDE EFFECTS',
-              'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF  SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
-              'CR price estimates', 'CR time for results', 'CR reported age'#, 'USES_2', 'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
+              'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
+              'CR price estimates', 'CR time for results', 'CR reported age', 'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
 )
 def get_html(url):
     '''Вернем текст страницы '''
@@ -55,7 +56,7 @@ def get_main_tab_data(content, name):
             elif tag.name == 'table' and tag.attrs.get('class'):
                 if tag.attrs.get('class')[0] == 'brd':
                     if first_brd_tab: # Проверим, первая ли таблица brd
-                        result['LIST OF  SUBSTITUTES (BRAND AND GENERIC NAMES)'] = str(tag).strip()
+                        result['LIST OF SUBSTITUTES (BRAND AND GENERIC NAMES)'] = str(tag).strip()
                         first_brd_tab = False
                 continue
             elif key:
@@ -104,12 +105,13 @@ def get_page_data(link):
     Сбор данных по одному препарату
     '''
     #Обработаем главную страницу
-    soup = BeautifulSoup(get_html(link), 'lxml')
+    soup = BeautifulSoup(get_html(link + '&showfull=1'), 'lxml')
     name = soup.h1
     name = re.search(r'^(.+) Uses', name.text).group(1)
     content = soup.find('div', attrs={'class': 'content'})
     result = get_main_tab_data(content, name)
     result['Name'] = name
+    result['link'] = link
     '''
     # и все остальные страницы
     inner_links = {'&t=dosage': 'DOSAGE_2', '&t=side effects': 'SIDE EFFECTS_2', '&t=pregnancy': 'Pregnancy', 
@@ -120,25 +122,84 @@ def get_page_data(link):
         i_link = link + i_link_key
         another_tab = get_other_tabs(i_link, inner_links[i_link_key])
     '''
-    write_file(result, 'result.json')      
+    write_file(result, 'result.json')    
     return result
 
 def sort_drug_values_gen(drug_data):
     for tab_header in TAB_HEADERS:
         yield drug_data.get(tab_header)
 
-def main():
-    link = 'https://www.ndrugs.com/?s=bendazol'
-    result = []
-    result.append(get_page_data(link))
+
+
+def to_db(drug_data):
+    conn = sqlite3.connect('parser.db')
+    cursor = conn.cursor()
+    query = 'SELECT link FROM ndrugs WHERE link=?'
+    cursor.execute(query, (drug_data['link'],))
+    if cursor.fetchone():
+        query = '''UPDATE ndrugs SET
+                       name=?,  link=?, what_is=?, indications=?, 
+                       how_should_i_use=?, uses_of_in_details=?, description=?, 
+                       dosage=?, interactions=?, side_effects=?, contraindications=?, 
+                       active_ingredient_matches=?,	
+                       Llist_of_substitutes=?, references_=?, 
+                       reviews=?, cr_useful=?, cr_price_estimates=?, 
+                       cr_time_for_results=?, cr_reported_age=?, 
+                       dosage_2=?, side_effects_2=?, pregnancy=?, overdose=?, 
+                       actions=? 
+                       WHERE link=?;
+        '''
+        TAB_HEADERS.append('link')
+        cursor.execute(query, [drug_data[key] for key in TAB_HEADERS])
+        TAB_HEADERS.pop()
+
+        conn.commit()
+    else:
+        query = '''INSERT INTO ndrugs (
+                        name, link, what_is, indications, how_should_i_use, uses_of_in_details, description, dosage, interactions, 
+                        side_effects, contraindications, active_ingredient_matches, list_of_substitutes, references_, reviews, 
+                        cr_useful, cr_price_estimates, cr_time_for_results, cr_reported_age, dosage_2, side_effects_2, pregnancy, overdose, actions
+                   ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+        '''
+        cursor.execute(query, [drug_data[key] for key in TAB_HEADERS])
+        conn.commit()
+
+    conn.close()
+    print('done')
+
+def db_to_xlsx(field, values, fname='ndrugs_output.xlsx'):
+    '''
+    Записываем в xlsx, атрибуты - поле, по которому делаем отбор и последовательность значений этого поля
+    '''
+    query = f'SELECT * FROM ndrugs WHERE {field}=?'
     wb = Workbook()
     ws = wb.active
     ws.append(TAB_HEADERS)
-    for drug_data in result:
+    conn = sqlite3.connect('parser.db')
+    cursor = conn.cursor()
+    for value in values:
+        cursor.execute(query, (value, ))
+        ws.append(cursor.fetchone())
+    wb.save(fname)
+
+        
+
+def main():
+    link = 'https://www.ndrugs.com/?s=bendazol'
+    drug_data = get_page_data(link)
+    to_db(drug_data)
+
+    '''
+    list_of_results = []
+    list_of_results.append(get_page_data(link))
+    wb = Workbook()
+    ws = wb.active
+    ws.append(TAB_HEADERS)
+    for drug_data in list_of_results:
         gen = sort_drug_values_gen(drug_data)
         ws.append(gen)
     wb.save('ndrugs_result.xlsx')
-
+    '''
 
 
 
@@ -149,6 +210,8 @@ def test1():
     print(b)
 
 if __name__ == "__main__":
-    main()
+    #main()
+    db_to_xlsx('link', ('https://www.ndrugs.com/?s=bendazol',))
     #test1()
+    #print(len(TAB_HEADERS))
 
