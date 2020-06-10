@@ -5,13 +5,19 @@ import re
 import requests
 from openpyxl import Workbook
 import sqlite3
-
+from itertools import islice
+from time import sleep
 
 logging.basicConfig(filename='ndrugs_log.txt', level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 HEADERS = ('What is {}?', '{} indications', 'How should I use {}?', 'Uses of {} in details', '{} description',
            '{} dosage', '{} interactions', '{} side effects', '{} contraindications',
            'Active ingredient matches for {}:', 'References', 'Reviews'
 )
+HEADERS_DICT = {'What is ': 'WHAT IS?', ' indications': 'INDICATIONS', 'How should I use ': 'HOW SHOULD I USE?', 
+                ' in details': 'USES OF IN DETAILS', ' description': 'DESCRIPTION', ' dosage': 'DOSAGE', ' interactions': 'INTERACTIONS', 
+                ' side effects': 'SIDE EFFECTS', ' contraindications': 'CONTRAINDICATIONS', 'Active ingredient matches for :': 'ACTIVE INGREDIENT MATCHES', 
+                'References': 'REFERENCES', 'Reviews': 'REVIEWS'
+}
 HEADER_VALUES = ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN DETAILS', 'DESCRIPTION', 'DOSAGE', 'INTERACTIONS', 'SIDE EFFECTS',
               'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'REFERENCES', 'REVIEWS'
 )
@@ -23,15 +29,26 @@ MAIN_TAB_HEADERS= ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN D
               'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
               'CR price estimates', 'CR time for results', 'CR reported age', 'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
 )
+
+
 def get_html(url):
     '''Вернем текст страницы '''
+    proxy = {
+        'https': 'http://69.64.54.93:9191'
+    }
     headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36',
     }
-    r = requests.get(url, headers=headers)
+    r = requests.get(url, headers=headers, proxies=proxy)
     print(r.status_code)
     print(url)
     return r.text
+
+def header_check(tag_text):
+    for key in HEADERS_DICT:
+        if key in tag_text:
+            return HEADERS_DICT[key]
+
 
 def get_main_tab_data(content, name):
     '''
@@ -45,7 +62,11 @@ def get_main_tab_data(content, name):
     for tag in content.children:
         if isinstance(tag, element.Tag):
             if tag.name == 'h2':
+                key = header_check(tag.text)
+                #logging.debug(tag.text)
+                '''
                 if tag.text in fields_convert:
+                    logging.debug('imhere')
                     key = fields_convert[tag.text]
                     if key not in result: 
                         result[key] = ''
@@ -53,6 +74,7 @@ def get_main_tab_data(content, name):
                         result[key] = tag.next_sibling
                 else:
                     key = None
+                '''
             elif tag.name == 'table' and tag.attrs.get('class'):
                 if tag.attrs.get('class')[0] == 'brd':
                     if first_brd_tab: # Проверим, первая ли таблица brd
@@ -100,12 +122,12 @@ def get_other_tabs(link, key):
                 if tag.name in ['p', 'h4', 'h5', 'ul', 'center', 'b', 'ol']:
                     result[key] += str(tag).strip()
 
-def get_page_data(link):
+def get_page_data(link, session):
     '''
     Сбор данных по одному препарату
     '''
     #Обработаем главную страницу
-    soup = BeautifulSoup(get_html(link + '&showfull=1'), 'lxml')
+    soup = BeautifulSoup(get_html(link + '&showfull=1', session), 'lxml')
     name = soup.h1
     name = re.search(r'^(.+) Uses', name.text).group(1)
     content = soup.find('div', attrs={'class': 'content'})
@@ -142,7 +164,7 @@ def to_db(drug_data):
                        how_should_i_use=?, uses_of_in_details=?, description=?, 
                        dosage=?, interactions=?, side_effects=?, contraindications=?, 
                        active_ingredient_matches=?,	
-                       Llist_of_substitutes=?, references_=?, 
+                       list_of_substitutes=?, references_=?, 
                        reviews=?, cr_useful=?, cr_price_estimates=?, 
                        cr_time_for_results=?, cr_reported_age=?, 
                        dosage_2=?, side_effects_2=?, pregnancy=?, overdose=?, 
@@ -165,7 +187,7 @@ def to_db(drug_data):
         conn.commit()
 
     conn.close()
-    print('done')
+    print(f'{drug_data["Name"]} added to DB')
 
 def db_to_xlsx(field, values, fname='ndrugs_output.xlsx'):
     '''
@@ -181,13 +203,19 @@ def db_to_xlsx(field, values, fname='ndrugs_output.xlsx'):
         cursor.execute(query, (value, ))
         ws.append(cursor.fetchone())
     wb.save(fname)
-
-        
+    conn.close()
+    print(f'{fname} recorded')
 
 def main():
-    link = 'https://www.ndrugs.com/?s=bendazol'
-    drug_data = get_page_data(link)
-    to_db(drug_data)
+    #link = 'https://www.ndrugs.com/?s=bendazol'
+    session = requests.session()
+    with open('ndrugs_com_urls_clean.txt') as f:
+        links = islice(f, 51, 151)
+        for link in links:
+            drug_data = get_page_data(link.strip(), session)
+            to_db(drug_data)
+            sleep(1)
+
 
     '''
     list_of_results = []
@@ -211,7 +239,6 @@ def test1():
 
 if __name__ == "__main__":
     #main()
-    db_to_xlsx('link', ('https://www.ndrugs.com/?s=bendazol',))
+    #db_to_xlsx('rowid', range(2,31))
     #test1()
-    #print(len(TAB_HEADERS))
-
+    get_page_data('https://www.ndrugs.com/?s=%26alpha;-bisabolol/lactic%20acid/miglyol')
