@@ -31,7 +31,7 @@ MAIN_TAB_HEADERS= ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN D
 )
 
 
-def get_html(url):
+def get_html(url, session):
     '''Вернем текст страницы '''
     proxy = {
         'https': 'http://69.64.54.93:9191'
@@ -39,7 +39,7 @@ def get_html(url):
     headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36',
     }
-    r = requests.get(url, headers=headers, proxies=proxy)
+    r = session.get(url, headers=headers, proxies=proxy)
     print(r.status_code)
     print(url)
     return r.text
