@@ -7,6 +7,11 @@ from openpyxl import Workbook
 import sqlite3
 from itertools import islice
 from time import sleep
+from random import randint
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+ 
+
 
 logging.basicConfig(filename='ndrugs_log.txt', level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 HEADERS = ('What is {}?', '{} indications', 'How should I use {}?', 'Uses of {} in details', '{} description',
@@ -29,17 +34,22 @@ MAIN_TAB_HEADERS= ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN D
               'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
               'CR price estimates', 'CR time for results', 'CR reported age', 'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
 )
-
+PROXY = '161.35.114.60:8080'
 
 def get_html(url, session):
     '''Вернем текст страницы '''
     proxy = {
-        'https': 'http://69.64.54.93:9191'
+        'http': 'http://' + PROXY,
+        'https': 'http://' + PROXY
     }
     headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36',
     }
-    r = session.get(url, headers=headers, proxies=proxy)
+    try:
+        r = session.get(url, headers=headers, proxies=proxy)#, allow_redirects=True)
+    except:
+        sleep(3)
+        r = session.get(url, headers=headers, proxies=proxy)#, allow_redirects=True)
     print(r.status_code)
     print(url)
     return r.text
@@ -54,8 +64,6 @@ def get_main_tab_data(content, name):
     '''
     Сбор данных с основной вкладки
     '''
-    headers = [header.format(name) for header in HEADERS]
-    fields_convert = dict(zip(headers, HEADER_VALUES))
     key = None
     result = {col: '' for col in MAIN_TAB_HEADERS}
     first_brd_tab = True # есть две таблицы одного класса, нам нужна первая
@@ -87,7 +95,6 @@ def get_main_tab_data(content, name):
                         but = tag.button
                         if but:
                             but.decompose()
-                        empty = False
                         if tag.attrs.get('class')[0] == 'vote_result':
                             if 'No survey data has been collected yet' in tag.text.strip():
                                 continue        
@@ -110,40 +117,64 @@ def get_other_tabs(link, key):
     soup = BeautifulSoup(get_html(link), 'lxml')
     content = soup.find('div', attrs={'class': 'content'})
     check = False
-    review = False
+
     result = {key: ''}
     for tag in content.children:
         if isinstance(tag, element.Tag):
             if tag.name == 'h2':
                 check = True
                 if tag.text == 'Reviews':
-                    review = True
+                    pass
             elif check:
                 if tag.name in ['p', 'h4', 'h5', 'ul', 'center', 'b', 'ol']:
                     result[key] += str(tag).strip()
 
-def get_page_data(link, session):
+def create_selenium_driver():
+    opts = Options()
+    opts.headless = True
+    assert opts.headless
+    caps = webdriver.DesiredCapabilities.FIREFOX
+    caps['marionette'] = True    
+    caps['proxy'] = {
+    "proxyType": "MANUAL",
+    "httpProxy": PROXY,
+    "ftpProxy": PROXY,
+    "sslProxy": PROXY
+    }
+    
+    driver = webdriver.Firefox(options=opts, capabilities=caps)
+    return driver
+
+def get_soup_via_selenium(link, driver):
+    '''
+    Создаем суп по ссылке. Драйвер не закрываем, дабы сохранить сессию
+    '''
+
+    driver.get(link)
+    soup = BeautifulSoup(driver.page_source, 'lxml')
+    logging.debug(soup.prettify())
+
+    return soup
+
+
+
+
+
+def get_page_data(link, driver):
     '''
     Сбор данных по одному препарату
     '''
     #Обработаем главную страницу
-    soup = BeautifulSoup(get_html(link + '&showfull=1', session), 'lxml')
+    #soup = BeautifulSoup(get_html(link + '&showfull=1', session), 'lxml')
+    
+    soup = get_soup_via_selenium(link + '&showfull=1', driver)
     name = soup.h1
     name = re.search(r'^(.+) Uses', name.text).group(1)
     content = soup.find('div', attrs={'class': 'content'})
+    logging.debug(content.prettify())
     result = get_main_tab_data(content, name)
     result['Name'] = name
     result['link'] = link
-    '''
-    # и все остальные страницы
-    inner_links = {'&t=dosage': 'DOSAGE_2', '&t=side effects': 'SIDE EFFECTS_2', '&t=pregnancy': 'Pregnancy', 
-                   '&t=overdose': 'Overdose', '&t=actions': 'Actions'
-    }
-
-    for i_link_key in inner_links:
-        i_link = link + i_link_key
-        another_tab = get_other_tabs(i_link, inner_links[i_link_key])
-    '''
     write_file(result, 'result.json')    
     return result
 
@@ -207,29 +238,18 @@ def db_to_xlsx(field, values, fname='ndrugs_output.xlsx'):
     print(f'{fname} recorded')
 
 def main():
-    #link = 'https://www.ndrugs.com/?s=bendazol'
-    session = requests.session()
+    session = requests.Session()
+    links_done = []
     with open('ndrugs_com_urls_clean.txt') as f:
-        links = islice(f, 51, 151)
-        for link in links:
-            drug_data = get_page_data(link.strip(), session)
-            to_db(drug_data)
-            sleep(1)
-
-
-    '''
-    list_of_results = []
-    list_of_results.append(get_page_data(link))
-    wb = Workbook()
-    ws = wb.active
-    ws.append(TAB_HEADERS)
-    for drug_data in list_of_results:
-        gen = sort_drug_values_gen(drug_data)
-        ws.append(gen)
-    wb.save('ndrugs_result.xlsx')
-    '''
-
-
+        links = islice(f, 24, 64)
+        driver = create_selenium_driver()
+        with driver:
+            for link in links:
+                drug_data = get_page_data(link.strip(), driver)
+                to_db(drug_data)
+                links_done.append(link)
+                sleep(randint(10,20))
+    logging.debug(links_done)
 
 def test1():
     a = '<a name="review"></a><h2>Reviews</h2>The results of a survey conducted on ndrugs.com for Bendazol are given in detail below. The results of the survey conducted are based on the impressions and views of the website users and consumers taking Bendazol. We implore you to kindly base your medical condition or therapeutic choices on the result or test conducted by a physician or licensed medical practitioners.<h3>User reports</h3>'
@@ -237,8 +257,17 @@ def test1():
     b = soup.h2.next_sibling
     print(b)
 
+def test2():
+    session = requests.Session()
+    get_page_data('http://www.ndrugs.com/?s=%26alpha;-bisabolol/lactic%20acid/miglyol', session)
+def test3():
+    link = 'http://yandex.ru'
+    #soup = get_soup_via_selenium(link,driver)
+    #logging.debug(soup.prettify())
+
 if __name__ == "__main__":
-    #main()
-    #db_to_xlsx('rowid', range(2,31))
+    main()
+    #db_to_xlsx('rowid', range(0,))
     #test1()
-    get_page_data('https://www.ndrugs.com/?s=%26alpha;-bisabolol/lactic%20acid/miglyol')
+    #test3()
+    
