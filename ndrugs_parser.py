@@ -8,8 +8,8 @@ import sqlite3
 from itertools import islice
 from time import sleep
 from random import randint
-from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
+
+
  
 
 
@@ -34,7 +34,12 @@ MAIN_TAB_HEADERS= ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN D
               'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
               'CR price estimates', 'CR time for results', 'CR reported age', 'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
 )
-PROXY = '161.35.114.60:8080'
+PROXY2 = '161.35.114.60:8080'
+PROXY3 = '45.76.137.71:8080'
+PROXY4 = '64.225.77.173:8080'
+PROXY5 = '198.98.54.241:8080'
+PROXY6 = '80.187.140.26:8080'
+PROXY = '178.63.41.235:9999'
 
 def get_html(url, session):
     '''Вернем текст страницы '''
@@ -52,13 +57,29 @@ def get_html(url, session):
         r = session.get(url, headers=headers, proxies=proxy)#, allow_redirects=True)
     print(r.status_code)
     print(url)
+    logging.debug(r.status_code)
+    logging.debug(url)
+    logging.debug('******'*3)
     return r.text
 
 def header_check(tag_text):
+    '''
+    Проверка h2 заголовков, совпадают ли они с разделами, которые нам нужно спарсить
+    '''
     for key in HEADERS_DICT:
         if key in tag_text:
             return HEADERS_DICT[key]
 
+def link_to_text(a):
+    '''Меняет ссылку на текст'''
+    sub = BeautifulSoup(a.text, 'html.parser')
+    a.replace_with(sub)
+
+def link_cleaner(tag):
+    '''Ссылки превращаем в обычный текст, также ссылки на разделы сайта убираем'''
+    links = tag.find_all('a')
+    for link in links:
+        link_to_text(link)
 
 def get_main_tab_data(content, name):
     '''
@@ -71,7 +92,6 @@ def get_main_tab_data(content, name):
         if isinstance(tag, element.Tag):
             if tag.name == 'h2':
                 key = header_check(tag.text)
-                #logging.debug(tag.text)
                 '''
                 if tag.text in fields_convert:
                     logging.debug('imhere')
@@ -86,6 +106,7 @@ def get_main_tab_data(content, name):
             elif tag.name == 'table' and tag.attrs.get('class'):
                 if tag.attrs.get('class')[0] == 'brd':
                     if first_brd_tab: # Проверим, первая ли таблица brd
+                        link_cleaner(tag)
                         result['LIST OF SUBSTITUTES (BRAND AND GENERIC NAMES)'] = str(tag).strip()
                         first_brd_tab = False
                 continue
@@ -128,7 +149,7 @@ def get_other_tabs(link, key):
             elif check:
                 if tag.name in ['p', 'h4', 'h5', 'ul', 'center', 'b', 'ol']:
                     result[key] += str(tag).strip()
-
+"""
 def create_selenium_driver():
     opts = Options()
     opts.headless = True
@@ -156,22 +177,19 @@ def get_soup_via_selenium(link, driver):
 
     return soup
 
+"""
 
 
 
-
-def get_page_data(link, driver):
+def get_page_data(link, session):
     '''
     Сбор данных по одному препарату
     '''
     #Обработаем главную страницу
-    #soup = BeautifulSoup(get_html(link + '&showfull=1', session), 'lxml')
-    
-    soup = get_soup_via_selenium(link + '&showfull=1', driver)
+    soup = BeautifulSoup(get_html(link + '&showfull=1', session), 'lxml')
     name = soup.h1
     name = re.search(r'^(.+) Uses', name.text).group(1)
     content = soup.find('div', attrs={'class': 'content'})
-    logging.debug(content.prettify())
     result = get_main_tab_data(content, name)
     result['Name'] = name
     result['link'] = link
@@ -220,36 +238,38 @@ def to_db(drug_data):
     conn.close()
     print(f'{drug_data["Name"]} added to DB')
 
-def db_to_xlsx(field, values, fname='ndrugs_output.xlsx'):
+def db_to_xlsx(field=None, values=None, all=True, fname='ndrugs_output.xlsx'):
     '''
     Записываем в xlsx, атрибуты - поле, по которому делаем отбор и последовательность значений этого поля
     '''
-    query = f'SELECT * FROM ndrugs WHERE {field}=?'
     wb = Workbook()
     ws = wb.active
     ws.append(TAB_HEADERS)
     conn = sqlite3.connect('parser.db')
     cursor = conn.cursor()
-    for value in values:
-        cursor.execute(query, (value, ))
-        ws.append(cursor.fetchone())
+    if all:
+        query = f'SELECT * FROM ndrugs'
+        cursor.execute(query)
+        for rec in cursor.fetchall():
+            ws.append(rec)
+    else:
+        query = f'SELECT * FROM ndrugs WHERE {field}=?'
+        for value in values:
+            cursor.execute(query, (value, ))
+            ws.append(cursor.fetchone())
     wb.save(fname)
     conn.close()
     print(f'{fname} recorded')
 
 def main():
     session = requests.Session()
-    links_done = []
     with open('ndrugs_com_urls_clean.txt') as f:
-        links = islice(f, 24, 64)
-        driver = create_selenium_driver()
-        with driver:
-            for link in links:
-                drug_data = get_page_data(link.strip(), driver)
-                to_db(drug_data)
-                links_done.append(link)
-                sleep(randint(10,20))
-    logging.debug(links_done)
+        links = islice(f, 99, 109)
+        for link in links:
+            drug_data = get_page_data(link.strip(), session)
+            to_db(drug_data)
+            sleep(randint(1,5))
+
 
 def test1():
     a = '<a name="review"></a><h2>Reviews</h2>The results of a survey conducted on ndrugs.com for Bendazol are given in detail below. The results of the survey conducted are based on the impressions and views of the website users and consumers taking Bendazol. We implore you to kindly base your medical condition or therapeutic choices on the result or test conducted by a physician or licensed medical practitioners.<h3>User reports</h3>'
@@ -263,11 +283,11 @@ def test2():
 def test3():
     link = 'http://yandex.ru'
     #soup = get_soup_via_selenium(link,driver)
-    #logging.debug(soup.prettify())
+
 
 if __name__ == "__main__":
     main()
-    #db_to_xlsx('rowid', range(0,))
+    #db_to_xlsx()
     #test1()
     #test3()
     
