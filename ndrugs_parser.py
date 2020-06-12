@@ -20,7 +20,7 @@ HEADERS = ('What is {}?', '{} indications', 'How should I use {}?', 'Uses of {} 
 )
 HEADERS_DICT = {'What is ': 'WHAT IS?', ' indications': 'INDICATIONS', 'How should I use ': 'HOW SHOULD I USE?', 
                 ' in details': 'USES OF IN DETAILS', ' description': 'DESCRIPTION', ' dosage': 'DOSAGE', ' interactions': 'INTERACTIONS', 
-                ' side effects': 'SIDE EFFECTS', ' contraindications': 'CONTRAINDICATIONS', 'Active ingredient matches for :': 'ACTIVE INGREDIENT MATCHES', 
+                ' side effects': 'SIDE EFFECTS', ' contraindications': 'CONTRAINDICATIONS', 'Active ingredient matches ': 'ACTIVE INGREDIENT MATCHES', 
                 'References': 'REFERENCES', 'Reviews': 'REVIEWS'
 }
 HEADER_VALUES = ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN DETAILS', 'DESCRIPTION', 'DOSAGE', 'INTERACTIONS', 'SIDE EFFECTS',
@@ -39,10 +39,21 @@ PROXY3 = '45.76.137.71:8080'
 PROXY4 = '64.225.77.173:8080'
 PROXY5 = '198.98.54.241:8080'
 PROXY6 = '80.187.140.26:8080'
-PROXY = '178.63.41.235:9999'
+PROXY7 = '178.63.41.235:9999'
+PROXY8 = '51.158.172.165:8811'
+
+def proxy_gen(start):
+    with open ('proxy_http_ip.txt') as f:
+        for line in islice(f, start, None):
+            for i in range(20):
+                yield line.strip(), i
+
+gen = proxy_gen(6)
 
 def get_html(url, session):
     '''Вернем текст страницы '''
+
+    PROXY, count = next(gen)
     proxy = {
         'http': 'http://' + PROXY,
         'https': 'http://' + PROXY
@@ -55,11 +66,18 @@ def get_html(url, session):
     except:
         sleep(3)
         r = session.get(url, headers=headers, proxies=proxy)#, allow_redirects=True)
+    if r.status_code == 503:
+        print('Cервер пятисотит. Ждем минуту...')
+        logging.info('Cервер пятисотит. Ждем минуту...')
+        sleep(60)
+        r = session.get(url, headers=headers, proxies=proxy)
     print(r.status_code)
     print(url)
-    logging.debug(r.status_code)
-    logging.debug(url)
-    logging.debug('******'*3)
+    logging.info('******'*3)
+    logging.info(r.status_code)
+    logging.info(url)
+    logging.info(f'PROXY: {PROXY}, used {count} times')
+
     return r.text
 
 def header_check(tag_text):
@@ -85,6 +103,7 @@ def get_main_tab_data(content, name):
     '''
     Сбор данных с основной вкладки
     '''
+    
     key = None
     result = {col: '' for col in MAIN_TAB_HEADERS}
     first_brd_tab = True # есть две таблицы одного класса, нам нужна первая
@@ -92,17 +111,6 @@ def get_main_tab_data(content, name):
         if isinstance(tag, element.Tag):
             if tag.name == 'h2':
                 key = header_check(tag.text)
-                '''
-                if tag.text in fields_convert:
-                    logging.debug('imhere')
-                    key = fields_convert[tag.text]
-                    if key not in result: 
-                        result[key] = ''
-                    if tag.text == 'Reviews': # После заголовка текст идет без тегов. Парсим его
-                        result[key] = tag.next_sibling
-                else:
-                    key = None
-                '''
             elif tag.name == 'table' and tag.attrs.get('class'):
                 if tag.attrs.get('class')[0] == 'brd':
                     if first_brd_tab: # Проверим, первая ли таблица brd
@@ -187,6 +195,7 @@ def get_page_data(link, session):
     '''
     #Обработаем главную страницу
     soup = BeautifulSoup(get_html(link + '&showfull=1', session), 'lxml')
+    #logging.debug(soup.prettify())
     name = soup.h1
     name = re.search(r'^(.+) Uses', name.text).group(1)
     content = soup.find('div', attrs={'class': 'content'})
@@ -264,7 +273,7 @@ def db_to_xlsx(field=None, values=None, all=True, fname='ndrugs_output.xlsx'):
 def main():
     session = requests.Session()
     with open('ndrugs_com_urls_clean.txt') as f:
-        links = islice(f, 99, 109)
+        links = islice(f, 104, 1000)
         for link in links:
             drug_data = get_page_data(link.strip(), session)
             to_db(drug_data)
@@ -277,9 +286,9 @@ def test1():
     b = soup.h2.next_sibling
     print(b)
 
-def test2():
+def test2(link):
     session = requests.Session()
-    get_page_data('http://www.ndrugs.com/?s=%26alpha;-bisabolol/lactic%20acid/miglyol', session)
+    get_page_data(link , session)
 def test3():
     link = 'http://yandex.ru'
     #soup = get_soup_via_selenium(link,driver)
@@ -288,6 +297,8 @@ def test3():
 if __name__ == "__main__":
     main()
     #db_to_xlsx()
-    #test1()
+    
+    #test2('http://www.ndrugs.com/?s=%C4%B0esef')
+    #test2('http://www.ndrugs.com/?s=alodorm')
     #test3()
     
