@@ -34,6 +34,8 @@ MAIN_TAB_HEADERS= ('WHAT IS?', 'INDICATIONS', 'HOW SHOULD I USE?', 'USES OF IN D
               'CONTRAINDICATIONS', 'ACTIVE INGREDIENT MATCHES',	'LIST OF SUBSTITUTES (BRAND AND GENERIC NAMES)', 'REFERENCES', 'REVIEWS', 'CR useful', 
               'CR price estimates', 'CR time for results', 'CR reported age', 'DOSAGE_2', 'SIDE EFFECTS_2', 'Pregnancy', 'Overdose', 'Actions'
 )
+
+
 PROXY2 = '161.35.114.60:8080'
 PROXY3 = '45.76.137.71:8080'
 PROXY4 = '64.225.77.173:8080'
@@ -41,44 +43,54 @@ PROXY5 = '198.98.54.241:8080'
 PROXY6 = '80.187.140.26:8080'
 PROXY7 = '178.63.41.235:9999'
 PROXY8 = '51.158.172.165:8811'
+PROXY9 = '52.179.18.244	8080'
+
 
 def proxy_gen(start):
     with open ('proxy_http_ip.txt') as f:
         for line in islice(f, start, None):
             for i in range(20):
-                yield line.strip(), i
-
-gen = proxy_gen(6)
+                switch = yield line.strip(), i
+                if switch == 'switch':
+                    break
+            
+gen = proxy_gen(23)
 
 def get_html(url, session):
     '''Вернем текст страницы '''
 
-    PROXY, count = next(gen)
-    proxy = {
-        'http': 'http://' + PROXY,
-        'https': 'http://' + PROXY
+    proxy, count = next(gen)
+    proxies = {
+        'http': 'http://' + proxy,
+        'https': 'http://' + proxy
     }
     headers = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36',
     }
     try:
-        r = session.get(url, headers=headers, proxies=proxy)#, allow_redirects=True)
+        r = session.get(url, headers=headers, proxies=proxies)#, allow_redirects=True)
     except:
         sleep(3)
-        r = session.get(url, headers=headers, proxies=proxy)#, allow_redirects=True)
+        r = session.get(url, headers=headers, proxies=proxies)#, allow_redirects=True)
     if r.status_code == 503:
         print('Cервер пятисотит. Ждем минуту...')
         logging.info('Cервер пятисотит. Ждем минуту...')
         sleep(60)
-        r = session.get(url, headers=headers, proxies=proxy)
+        r = session.get(url, headers=headers, proxies=proxies)
     print(r.status_code)
     print(url)
     logging.info('******'*3)
     logging.info(r.status_code)
     logging.info(url)
     logging.info(f'PROXY: {PROXY}, used {count} times')
+    result = r.text
+    if r.status_code == 403:
+        print('Переключаем прокси')
+        logging.info('Переключаем прокси')
+        gen.send('switch')
+        result = get_html(url, session)
 
-    return r.text
+    return result
 
 def header_check(tag_text):
     '''
@@ -273,8 +285,10 @@ def db_to_xlsx(field=None, values=None, all=True, fname='ndrugs_output.xlsx'):
 def main():
     session = requests.Session()
     with open('ndrugs_com_urls_clean.txt') as f:
-        links = islice(f, 104, 1000)
+        links = islice(f, 385, 1000)
         for link in links:
+            link = link.replace('https', 'http')
+            print(link)
             drug_data = get_page_data(link.strip(), session)
             to_db(drug_data)
             sleep(randint(1,5))
@@ -288,6 +302,7 @@ def test1():
 
 def test2(link):
     session = requests.Session()
+
     get_page_data(link , session)
 def test3():
     link = 'http://yandex.ru'
