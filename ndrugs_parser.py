@@ -47,14 +47,14 @@ PROXY9 = '52.179.18.244	8080'
 
 
 def proxy_gen(start):
-    with open ('proxy_http_ip.txt') as f:
+    with open ('proxz.txt') as f:
         for line in islice(f, start, None):
             for i in range(20):
                 switch = yield line.strip(), i
                 if switch == 'switch':
                     break
             
-gen = proxy_gen(23)
+gen = proxy_gen(68)
 
 def get_html(url, session):
     '''Вернем текст страницы '''
@@ -70,25 +70,32 @@ def get_html(url, session):
     try:
         r = session.get(url, headers=headers, proxies=proxies)#, allow_redirects=True)
     except:
-        sleep(3)
-        r = session.get(url, headers=headers, proxies=proxies)#, allow_redirects=True)
-    if r.status_code == 503:
+        print(f'Ошибка. Переключаем прокси {proxy}, использованную {count} раз')
+        logging.info(f'Ошибка. Переключаем прокси {proxy}, использованную {count} раз')
+        gen.send('switch')
+        print('Ждем 10 секунд...')
+        sleep(10)
+        return get_html(url, session)
+    if r.status_code in (503, 500, 502):
         print('Cервер пятисотит. Ждем минуту...')
         logging.info('Cервер пятисотит. Ждем минуту...')
         sleep(60)
         r = session.get(url, headers=headers, proxies=proxies)
+    print()
     print(r.status_code)
     print(url)
     logging.info('******'*3)
     logging.info(r.status_code)
     logging.info(url)
-    logging.info(f'PROXY: {PROXY}, used {count} times')
+    logging.info(f'PROXY: {proxy}, used {count} times')
     result = r.text
-    if r.status_code == 403:
-        print('Переключаем прокси')
-        logging.info('Переключаем прокси')
+    if r.status_code in (403, 407, 404, 400):
+        print(f'Ошибка {r.status_code}. Переключаем прокси {proxy}')
+        logging.info(f'Ошибка {r.status_code}. Переключаем прокси {proxy}')
+        sleep(5)
         gen.send('switch')
-        result = get_html(url, session)
+        return get_html(url, session)
+    
 
     return result
 
@@ -209,7 +216,10 @@ def get_page_data(link, session):
     soup = BeautifulSoup(get_html(link + '&showfull=1', session), 'lxml')
     #logging.debug(soup.prettify())
     name = soup.h1
-    name = re.search(r'^(.+) Uses', name.text).group(1)
+    try:
+        name = re.search(r'^(.+) Uses', name.text).group(1)
+    except:
+        return None
     content = soup.find('div', attrs={'class': 'content'})
     result = get_main_tab_data(content, name)
     result['Name'] = name
@@ -285,12 +295,14 @@ def db_to_xlsx(field=None, values=None, all=True, fname='ndrugs_output.xlsx'):
 def main():
     session = requests.Session()
     with open('ndrugs_com_urls_clean.txt') as f:
-        links = islice(f, 385, 1000)
+        links = islice(f, 708, 1000)
         for link in links:
             link = link.replace('https', 'http')
-            print(link)
             drug_data = get_page_data(link.strip(), session)
-            to_db(drug_data)
+            if drug_data:
+                to_db(drug_data)
+            else:
+                logging.warning(f'Ссылка {link} не спаршена')
             sleep(randint(1,5))
 
 
